@@ -1,0 +1,52 @@
+name:          discrimination
+category:      Data, Sorting
+version:       0
+license:       BSD3
+cabal-version: >= 1.10
+license-file:  LICENSE
+author:        Edward A. Kmett
+maintainer:    Edward A. Kmett <ekmett@gmail.com>
+stability:     experimental
+homepage:      http://github.com/ekmett/discrimination/
+bug-reports:   http://github.com/ekmett/discrimination/issues
+copyright:     Copyright (C) 2014 Edward A. Kmett
+build-type:    Simple
+tested-with:   GHC == 7.8.3
+synopsis:      Fast generic linear-time discrimination and sorting
+description:   Fast generic linear-time discrimination and sorting
+
+extra-source-files:
+  .ghci
+  .gitignore
+  .vim.custom
+  HLint.hs
+  CHANGELOG.markdown
+  README.markdown
+
+source-repository head
+  type: git
+  location: git://github.com/ekmett/discrimination.git
+
+library
+  default-language: Haskell2010
+  ghc-options: -Wall -O2
+  hs-source-dirs: src
+  exposed-modules:
+    Data.Discrimination
+    Data.Discrimination.Key
+    Data.Discrimination.Order
+    Data.Discrimination.Ordered
+    Data.Discrimination.Type
+    Data.Discrimination.Unordered
+
+  build-depends:
+    base >= 4.7 && < 5,
+    bytestring,
+    containers,
+    contravariant >= 1.2,
+    data-default,
+    primitive,
+    text,
+    transformers,
+    vector,
+    void
