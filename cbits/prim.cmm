@@ -24,7 +24,7 @@ walkList:
 
   switch [INVALID_OBJECT .. N_CLOSURE_TYPES] type {
     case IND, IND_PERM, IND_STATIC: { /* indirection */
-      clos = UNTAG(StgInd_indirectee(clos));
+      list_clos = UNTAG(StgInd_indirectee(list_clos));
       goto walkList; /* follow it and try again */
     }
     case CONSTR_STATIC: { /* [] */
@@ -35,8 +35,8 @@ walkList:
        pair_clos = UNTAG(StgClosure_payload(list_clos, 0));
        next_clos = UNTAG(StgClosure_payload(list_clos, 1));
 walkPair:
-       .. process the pair
-       type = TO_W_(%INFO_TYPE(%GET_STD_INFO(pair_clos));
+       // .. process the pair
+       type = TO_W_(%INFO_TYPE(%GET_STD_INFO(pair_clos)));
        switch [INVALID_OBJECT .. N_CLOSURE_TYPES] type {
          case IND, IND_PERM, IND_STATIC: { /* indirection */
            pair_clos = UNTAG(StgInd_indirectee(pair_clos));
@@ -53,7 +53,8 @@ walkIORef:
                goto walkIORef;
              }
              case CONSTR_1_0: {
-               P_ mutvar_clos = UNTAG(StgClosure_payload(ioref_clos, 0)); // retrieve the MutVar#
+               P_ mutvar_clos;
+               mutvar_clos = UNTAG(StgClosure_payload(ioref_clos, 0)); // retrieve the MutVar#
 walkMutVar:
                type = TO_W_(%INFO_TYPE(%GET_STD_INFO(mutvar_clos)));
                switch [INVALID_OBJECT .. N_CLOSURE_TYPES] type {
