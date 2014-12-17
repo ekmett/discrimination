@@ -1,0 +1,94 @@
+#include "Cmm.h"
+
+/* 
+  walk :: [(IORef a, b)] -> MutableByteArray# RealWorld -> State# RealWorld -> State# RealWorld 
+
+is disguised as
+
+  walk :: Any -> MutableByteArray# RealWorld -> State# RealWorld -> State# RealWorld
+
+to convince the RTS to let us call it.
+*/
+
+walk(P_ lpr, P_ mba)
+{
+  W_ i;
+  i = 0;
+
+  W_ list_clos;
+  list_clos = UNTAG(lpr);
+
+walkList:
+  W_ type;
+  type = TO_W_(%INFO_TYPE(%GET_STD_INFO(list_clos)));
+
+  switch [INVALID_OBJECT .. N_CLOSURE_TYPES] type {
+    case IND, IND_PERM, IND_STATIC: { /* indirection */
+      clos = UNTAG(StgInd_indirectee(clos));
+      goto walkList; /* follow it and try again */
+    }
+    case CONSTR_STATIC: { /* [] */
+      goto walkNil;
+    }
+    case CONSTR_2_0: { /* pair_clos:next_clos */
+       P_ pair_clos, next_clos;
+       pair_clos = UNTAG(StgClosure_payload(list_clos, 0));
+       next_clos = UNTAG(StgClosure_payload(list_clos, 1));
+walkPair:
+       .. process the pair
+       type = TO_W_(%INFO_TYPE(%GET_STD_INFO(pair_clos));
+       switch [INVALID_OBJECT .. N_CLOSURE_TYPES] type {
+         case IND, IND_PERM, IND_STATIC: { /* indirection */
+           pair_clos = UNTAG(StgInd_indirectee(pair_clos));
+           goto walkPair; /* follow it and try again */
+         }
+         case CONSTR_2_0: { /* (r,a) */
+           P_ ioref_clos;
+           ioref_clos = UNTAG(StgClosure_payload(pair_clos, 0)); // fst
+walkIORef:
+           type = TO_W_(%INFO_TYPE(%GET_STD_INFO(ioref_clos)));
+           switch [INVALID_OBJECT .. N_CLOSURE_TYPES] type {
+             case IND, IND_PERM, IND_STATIC: {
+               ioref_clos = UNTAG(StgInd_indirectee(ioref_clos));
+               goto walkIORef;
+             }
+             case CONSTR_1_0: {
+               P_ mutvar_clos = UNTAG(StgClosure_payload(ioref_clos, 0)); // retrieve the MutVar#
+walkMutVar:
+               type = TO_W_(%INFO_TYPE(%GET_STD_INFO(mutvar_clos)));
+               switch [INVALID_OBJECT .. N_CLOSURE_TYPES] type {
+                 case IND, IND_PERM, IND_STATIC: {
+                   mutvar_clos = UNTAG(StgInd_indirectee(mutvar_clos));
+                   goto walkMutVar;
+                 }
+                 case MUT_VAR_CLEAN, MUT_VAR_DIRTY: {
+                   W_ addr;
+                   addr = TO_W_(mutvar_clos);
+                   // TODO: copy the entry over to mba[i]
+                   // advance
+                   i = i + 1;
+                   list_clos = next_clos;
+                   goto walkList;
+                 }
+                 default: {
+                   ccall barf("walk: unexpected MutVar# closure type entered!") never returns;
+                 }
+               }
+             }
+             default: {
+               ccall barf("walk: unexpected IORef closure type entered!") never returns;
+             }
+           }
+         }
+         default: {
+           ccall barf("walk: unexpected product closure type entered!") never returns;
+         }
+       }
+    }
+    default: {
+      ccall barf("walk: unexpected list closure type entered!") never returns;
+    }
+  }
+walkNil:
+  return ();
+}

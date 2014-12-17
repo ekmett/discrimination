@@ -1,4 +1,6 @@
 {-# LANGUAGE GADTs, TypeOperators, RankNTypes, DeriveDataTypeable, DefaultSignatures, FlexibleContexts #-}
+{-# LANGUAGE ForeignFunctionInterface, UnliftedFFITypes, MagicHash #-}
+{-# LANGUAGE RoleAnnotations #-}
 {-# OPTIONS_GHC -rtsopts -threaded -fno-cse -fno-full-laziness #-}
 
 module Data.Discrimination.Type
@@ -16,10 +18,13 @@ import Data.Functor
 import Data.Functor.Contravariant
 import Data.Functor.Contravariant.Divisible
 import Data.Int
+import Data.IORef
 import Data.Monoid
 import Data.Typeable
 import Data.Void
 import Data.Vector.Mutable as MV
+import Foreign.C.Types
+import GHC.Prim
 import Prelude hiding (read)
 import System.IO.Unsafe
 
@@ -28,6 +33,8 @@ import System.IO.Unsafe
 -- TODO: use [(a,b)] -> [NonEmpty b] to better indicate safety?
 newtype Disc a = Disc { (%) :: forall b. [(a,b)] -> [[b]] }
   deriving Typeable
+
+type role Disc representational
 
 infixr 9 %
 
@@ -60,7 +67,7 @@ descending (Disc l) = Disc (reverse . l)
 discNat :: Int -> Disc Int
 discNat n = Disc $ unsafePerformIO $ do
   t <- MV.replicate n []
-  lock <- newMVar ()
+  lock <- newMVar () -- TODO have this hold onto a list of arrays like 't' and take 1
   let step1 keys (k, v) = read t k >>= \vs -> case vs of
         [] -> (k:keys) <$ write t k [v]
         _  -> keys     <$ write t k (v:vs)
@@ -71,7 +78,7 @@ discNat n = Disc $ unsafePerformIO $ do
         takeMVar lock
         ys <- foldM step1 [] xs
         zs <- foldM step2 [] ys
-        zs <$ putMVar lock ()
+        zs <$ putMVar lock () -- put the array back on the lazy list
       {-# NOINLINE go #-}
   return go
 {-# NOINLINE discNat #-}
@@ -84,3 +91,8 @@ sdiscNat = error "TODO"
 discShort :: Disc Int
 discShort = discNat 65536
 {-# NOINLINE discShort #-}
+
+discIORef :: Disc (IORef a)
+discIORef = undefined
+
+foreign import ccall unsafe "disc.h c_snapshotArray" snapshotArray :: Array# a -> MutableByteArray# RealWorld -> CInt -> IO ()
