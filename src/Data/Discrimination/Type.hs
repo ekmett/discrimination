@@ -1,32 +1,53 @@
-{-# LANGUAGE GADTs, TypeOperators, RankNTypes, DeriveDataTypeable, DefaultSignatures, FlexibleContexts #-}
-{-# LANGUAGE ForeignFunctionInterface, UnliftedFFITypes, MagicHash #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE RoleAnnotations #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ParallelListComp #-}
+{-# LANGUAGE UnliftedFFITypes #-}
+{-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE GHCForeignImportPrim #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
 {-# OPTIONS_GHC -rtsopts -threaded -fno-cse -fno-full-laziness #-}
-
 module Data.Discrimination.Type
   ( Disc(..)
   , descending
   , discNat
   , discShort
+  , discSTRef
+  , discIORef
   , sdiscNat
   ) where
 
 import Control.Arrow
-import Control.Concurrent
 import Control.Monad
+import Data.Coerce
 import Data.Functor
 import Data.Functor.Contravariant
 import Data.Functor.Contravariant.Divisible
 import Data.Int
-import Data.IORef
-import Data.Monoid
+import Data.IORef (newIORef, atomicModifyIORef)
+import Data.Monoid hiding (Any)
+import Data.Primitive.Types (Addr(..))
+import Data.Primitive.ByteArray (MutableByteArray(MutableByteArray))
 import Data.Typeable
 import Data.Void
-import Data.Vector.Mutable as MV
-import Foreign.C.Types
-import GHC.Prim
+import qualified Data.Vector.Mutable as UM
+import qualified Data.Vector.Primitive as P
+import qualified Data.Vector.Primitive.Mutable as PM
+import GHC.IO (IO(IO))
+import GHC.IORef (IORef(IORef))
+import GHC.Prim (Any, State#, RealWorld, MutableByteArray#, Int#)
+import GHC.STRef (STRef(STRef))
 import Prelude hiding (read)
 import System.IO.Unsafe
+import Unsafe.Coerce
 
 -- | Discriminator
 --
@@ -59,40 +80,65 @@ instance Monoid (Disc a) where
 descending :: Disc a -> Disc a
 descending (Disc l) = Disc (reverse . l)
 
+--------------------------------------------------------------------------------
+-- Primitives
+--------------------------------------------------------------------------------
+
 -- | unordered discrimination by bucket, not inherently thread-safe
 -- but it only has to restore the elements that were used
 -- unlike the more obvious ST implementation, so it wins by
 -- a huge margin in a race, especially when we have a large
--- keyspace, sparsely used, with low multi-threaded contention.
+-- keyspace, sparsely used, with low contention.
+-- This will leak a number of arrays equal to the maximum concurrent
+-- contention for this resource. If this becomes a bottleneck we can
+-- make multiple stacks of working pads and index the stack with the
+-- hash of the current thread id to reduce contention at the expense
+-- of taking more memory.
 discNat :: Int -> Disc Int
-discNat n = Disc $ unsafePerformIO $ do
-  t <- MV.replicate n []
-  lock <- newMVar () -- TODO have this hold onto a list of arrays like 't' and take 1
-  let step1 keys (k, v) = read t k >>= \vs -> case vs of
-        [] -> (k:keys) <$ write t k [v]
-        _  -> keys     <$ write t k (v:vs)
-      step2 vss k = do
-        elems <- read t k
-        (reverse elems : vss) <$ write t k []
-      go xs = unsafePerformIO $ do
-        takeMVar lock
-        ys <- foldM step1 [] xs
-        zs <- foldM step2 [] ys
-        zs <$ putMVar lock () -- put the array back on the lazy list
-      {-# NOINLINE go #-}
-  return go
+discNat n = unsafePerformIO $ do
+    ts <- newIORef ([] :: [UM.MVector RealWorld [Any]])
+    return $ Disc $ go ts
+  where
+    step1 t keys (k, v) = UM.read t k >>= \vs -> case vs of
+      [] -> (k:keys) <$ UM.write t k [v]
+      _  -> keys     <$ UM.write t k (v:vs)
+    step2 t vss k = do
+      elems <- UM.read t k
+      (reverse elems : vss) <$ UM.write t k []
+    go ts xs = unsafePerformIO $ do
+      mt <- atomicModifyIORef ts $ \case
+        (y:ys) -> (ys, Just y)
+        []     -> ([], Nothing)
+      t <- maybe (UM.replicate n []) (return . unsafeCoerce) mt
+      ys <- foldM (step1 t) [] xs
+      zs <- foldM (step2 t) [] ys
+      atomicModifyIORef ts $ \ws -> (unsafeCoerce t:ws, ())
+      return zs
+    {-# NOINLINE go #-}
 {-# NOINLINE discNat #-}
 
--- | discriminate by bucket, output ordered
 sdiscNat :: Int -> Disc Int
-sdiscNat = error "TODO"
+sdiscNat = undefined
 
 -- | Shared bucket set for small integers
 discShort :: Disc Int
 discShort = discNat 65536
 {-# NOINLINE discShort #-}
 
-discIORef :: Disc (IORef a)
-discIORef = undefined
+foreign import prim "walk" walk :: Any -> MutableByteArray# s -> State# s -> (# State# s, Int# #)
 
-foreign import ccall unsafe "disc.h c_snapshotArray" snapshotArray :: Array# a -> MutableByteArray# RealWorld -> CInt -> IO ()
+discSTRef :: Disc Addr -> Disc (STRef s a)
+discSTRef (Disc f) = Disc $ \xs -> 
+  let force !n !(!(STRef !_,_):ys) = force (n + 1) ys
+      force !n [] = n
+  in case force 0 xs of
+   !n -> unsafePerformIO $ do
+     mv@(PM.MVector _ _ (MutableByteArray mba)) <- PM.new n :: IO (PM.MVector RealWorld Addr)
+     IO $ \s -> case walk (unsafeCoerce xs) mba s of (# s', _ #) -> (# s', () #)
+     ys <- P.freeze mv
+     return $ f [ (a,snd kv) | kv <- xs | a <- P.toList ys ]
+{-# NOINLINE discSTRef #-}
+
+discIORef :: forall a. Disc Addr -> Disc (IORef a)
+discIORef = coerce (discSTRef :: Disc Addr -> Disc (STRef RealWorld a))
+

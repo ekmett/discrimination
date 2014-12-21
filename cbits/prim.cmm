@@ -1,11 +1,11 @@
 #include "Cmm.h"
 
 /* 
-  walk :: [(IORef a, b)] -> MutableByteArray# RealWorld -> State# RealWorld -> State# RealWorld 
+  walk :: [(IORef a, b)] -> MutableByteArray# RealWorld -> State# RealWorld -> (# State# RealWorld, Int# #)
 
 is disguised as
 
-  walk :: Any -> MutableByteArray# RealWorld -> State# RealWorld -> State# RealWorld
+  walk :: Any -> MutableByteArray# RealWorld -> State# RealWorld -> (# State# RealWorld, Int# #)
 
 to convince the RTS to let us call it.
 */
@@ -63,10 +63,7 @@ walkMutVar:
                    goto walkMutVar;
                  }
                  case MUT_VAR_CLEAN, MUT_VAR_DIRTY: {
-                   W_ addr;
-                   addr = TO_W_(mutvar_clos);
-                   // TODO: copy the entry over to mba[i]
-                   // advance
+                   W_[mba + i] = TO_W_(mutvar_clos);
                    i = i + 1;
                    list_clos = next_clos;
                    goto walkList;
@@ -91,5 +88,5 @@ walkMutVar:
     }
   }
 walkNil:
-  return ();
+  return (0);
 }

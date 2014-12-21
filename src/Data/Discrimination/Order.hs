@@ -1,10 +1,13 @@
+{-# LANGUAGE GADTs #-}
 module Data.Discrimination.Order where
 
+import Control.Arrow
 import Data.Discrimination.Discriminating
 import Data.Discrimination.Type
 import Data.Functor.Contravariant
 import Data.Functor.Contravariant.Divisible
-import Data.Reflection
+import Data.Monoid
+import Data.Void
 
 -- This is a legal contravariant functor
 -- but it is a legal Decidable functor only when viewed abstractly through the quotient of 'disc'.
@@ -51,16 +54,16 @@ instance Monoid (Order a) where
 sdisc :: Order a -> Disc a
 sdisc Conquer        = conquer
 sdisc (Natural k n)  = k `contramap` sdiscNat n
-sdisc (Divide k l r) = divide k l r
+sdisc (Divide k l r) = divide k (sdisc l) (sdisc r)
 sdisc (Lose k)       = lose k
-sdisc (Choose k l r) = choose k l r
+sdisc (Choose k l r) = choose k (sdisc l) (sdisc r)
 -- sdisc (Bag k r)      = sdiscColl insertBag a
 -- sdisc (Set k r)      = 
 sdisc (Desc r)       = descending (sdisc r)
 
 compareWith :: Order a -> a -> a -> Ordering
 compareWith Conquer _ _ = EQ
-compareWith (Natural k n) a b = compare (k a) (k b)
+compareWith (Natural k _) a b = compare (k a) (k b)
 compareWith (Divide k l r) a b = case k a of
   (a',a'') -> case k b of 
     (b',b'') -> compareWith l a' b' <> compareWith r a'' b''
