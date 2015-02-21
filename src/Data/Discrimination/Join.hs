@@ -7,6 +7,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module Data.Discrimination.Join
   ( Join(..)
+  , inner
   ) where
 
 import Control.Applicative
@@ -29,8 +30,6 @@ import Prelude hiding (read)
 import System.IO.Unsafe
 import Unsafe.Coerce
 import qualified Data.Vector.Mutable as UM
-
-
 
 -- | Linear time table inner joins
 newtype Join d = Join { runJoin :: forall a b c. (Table a -> Table b -> c) -> (a -> d) -> (b -> d) -> Table a -> Table b -> [c] }
@@ -84,4 +83,7 @@ instance Disorderable Join where
       {-# NOINLINE go #-}
   {-# NOINLINE discShort #-}
 
--- instance Orderable Join where
+-- TODO: instance Orderable Join where
+
+inner :: Disorder d => (a -> b -> c) -> (a -> d) -> (b -> d) -> Table a -> Table b -> [Table c]
+inner f = runJoin disorder (liftA2 f)
