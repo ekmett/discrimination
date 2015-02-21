@@ -8,6 +8,7 @@
 module Data.Discrimination.Table
   ( Table(Table, runTable)
   , table
+  , filter
   , filterMap
   , reverse
   , null
@@ -25,6 +26,7 @@ import Data.Traversable
 import GHC.Exts as Exts
 import Prelude hiding 
   ( reverse
+  , filter
 #if __GLASGOW_HASKELL__ < 710
   , null, length
 #endif
@@ -137,3 +139,7 @@ instance MonadFix Table where
 filterMap :: (a -> Maybe b) -> Table a -> Table b
 filterMap f m = table $ \k -> runTable m $ maybe mempty k . f
 {-# INLINE filterMap #-}
+
+filter :: (a -> Bool) -> Table a -> Table a
+filter p m = table $ \k -> runTable m $ \a -> if p a then k a else mempty
+{-# INLINE filter #-}
