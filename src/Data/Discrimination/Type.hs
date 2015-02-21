@@ -17,18 +17,14 @@
 {-# OPTIONS_GHC -rtsopts -threaded -fno-cse -fno-full-laziness #-}
 module Data.Discrimination.Type
   ( Disc(..)
-  , desc
   , discNat
-  , discShort
-  , sdiscNat
   , bdiscNat
-  -- , discSTRef
-  -- , discIORef
   ) where
 
 import Control.Arrow
 import Control.Monad
 import Data.Array as Array
+import Data.Discrimination.Class
 import Data.Functor
 import Data.Functor.Contravariant
 import Data.Functor.Contravariant.Divisible
@@ -62,6 +58,7 @@ newtype Disc a = Disc { (%) :: forall b. [(a,b)] -> [[b]] }
 
 type role Disc representational
 
+
 infixr 9 %
 
 instance Contravariant Disc where
@@ -82,9 +79,6 @@ instance Monoid (Disc a) where
   mempty = conquer
   mappend (Disc l) (Disc r) = Disc $ \xs -> l [ (fst x, x) | x <- xs ] >>= r
 
--- | Sort descending or partition in an anti-stable fashion
-desc :: Disc a -> Disc a
-desc (Disc l) = Disc (reverse . l)
 
 --------------------------------------------------------------------------------
 -- Primitives
@@ -123,19 +117,20 @@ discNat n = unsafePerformIO $ do
     {-# NOINLINE go #-}
 {-# NOINLINE discNat #-}
 
-sdiscNat :: Int -> Disc Int
-sdiscNat n = Disc $ \xs -> filter (not . null) (bdiscNat n update xs) where
-  update vs v = v : vs
-{-# INLINE sdiscNat #-}
+instance Orderable Disc where
+  sdiscNat n = Disc $ \xs -> filter (not . null) (bdiscNat n update xs) where
+    update vs v = v : vs
+  desc (Disc l) = Disc (reverse . l)
+  {-# INLINE sdiscNat #-}
 
-bdiscNat :: Int -> ([v] -> v -> [v]) -> [(Int, v)] -> [[v]]
+bdiscNat :: Int -> ([v] -> v -> [v]) -> [(Int,v)] -> [[v]]
 bdiscNat n update xs = reverse <$> Array.elems (Array.accumArray update [] (0,n) xs)
 {-# INLINE bdiscNat #-}
 
 -- | Shared bucket set for small integers
-discShort :: Disc Int
-discShort = discNat 65536
-{-# NOINLINE discShort #-}
+instance Disorderable Disc where
+  discShort = discNat 65536
+  {-# NOINLINE discShort #-}
 
 -- TODO: Finish discrimination for IORefs and STRefs
 

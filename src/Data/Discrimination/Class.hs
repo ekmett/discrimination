@@ -4,17 +4,17 @@
 
 module Data.Discrimination.Class
   ( -- * Unordered Discrimination
-    Disorder(..)
+    Disorderable(..)
+  , Disorder(..)
   , Disorder1(..)
     -- * Ordered Discrimination
+  , Orderable(..)
   , Order(..)
   , Order1(..)
   ) where
 
 import Data.Bits
 import Data.Discrimination.Generic
-import Data.Discrimination.Type
-import Data.Functor
 import Data.Functor.Compose
 import Data.Functor.Contravariant
 import Data.Functor.Contravariant.Divisible
@@ -24,13 +24,19 @@ import Data.Void
 import Data.Word
 import Prelude hiding (read)
 
+-- * Unordered Discrimination (for partitioning)
+
+class Decidable f => Disorderable f where
+  -- | Discriminate integers 65536 values at a time without revealing ordering
+  discShort :: f Int
+
 class Disorder a where
-  disorder :: Disc a
-  default disorder :: Deciding Disorder a => Disc a
+  disorder :: Disorderable f => f a
+  default disorder :: (Deciding Disorder a, Disorderable f) => f a
   disorder = deciding (Proxy :: Proxy Disorder) disorder
 
 instance Disorder Void where
-  disorder = Disc $ \vs -> [uncurry seq <$> vs]
+  disorder = lose id
 
 instance Disorder Word8 where
   disorder = contramap fromIntegral discShort 
@@ -61,10 +67,9 @@ instance (Disorder1 f, Disorder1 g, Disorder a) => Disorder (Compose f g a) wher
   disorder = getCompose `contramap` disorder1 (disorder1 disorder)
 
 class Disorder1 f where
-  disorder1 :: Disc a -> Disc (f a)
-  default disorder1 :: Deciding1 Disorder f => Disc a -> Disc (f a)
+  disorder1 :: Disorderable g => g a -> g (f a)
+  default disorder1 :: (Disorderable g, Deciding1 Disorder f) => g a -> g (f a)
   disorder1 = deciding1 (Proxy :: Proxy Disorder) disorder
-
 
 instance Disorder1 []
 instance Disorder1 Maybe
@@ -75,9 +80,18 @@ instance (Disorder a, Disorder b, Disorder c) => Disorder1 ((,,,) a b c)
 instance (Disorder1 f, Disorder1 g) => Disorder1 (Compose f g) where
   disorder1 f = getCompose `contramap` disorder1 (disorder1 f)
 
+-- * Ordered Discrimination
+
+class Decidable f => Orderable f where
+  -- | Discriminate integers in order
+  sdiscNat :: Int -> f Int
+
+  -- | Reverse the ordering
+  desc :: f a -> f a
+
 class Disorder a => Order a where
-  order :: Disc a
-  default order :: Deciding Order a => Disc a
+  order :: Orderable f => f a
+  default order :: (Orderable f, Deciding Order a) => f a
   order = deciding (Proxy :: Proxy Order) order
 
 instance Order Word8 where
@@ -98,8 +112,8 @@ instance (Order1 f, Order1 g, Order a) => Order (Compose f g a) where
   order = getCompose `contramap` order1 (order1 order)
 
 class Disorder1 f => Order1 f  where
-  order1 :: Disc a -> Disc (f a)
-  default order1 :: Deciding1 Order f => Disc a -> Disc (f a)
+  order1 :: Orderable g => g a -> g (f a)
+  default order1 :: (Orderable g, Deciding1 Order f) => g a -> g (f a)
   order1 = deciding1 (Proxy :: Proxy Order) order
 
 instance (Order1 f, Order1 g) => Order1 (Compose f g) where

@@ -36,6 +36,7 @@ library
     Data.Discrimination
     Data.Discrimination.Class
     Data.Discrimination.Combinators
+    Data.Discrimination.Join
     Data.Discrimination.Table
     Data.Discrimination.Type
     Data.Discrimination.Generic
