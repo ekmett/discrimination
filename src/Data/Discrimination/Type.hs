@@ -17,37 +17,42 @@
 {-# OPTIONS_GHC -rtsopts -threaded -fno-cse -fno-full-laziness #-}
 module Data.Discrimination.Type
   ( Disc(..)
-  , descending
+  , desc
   , discNat
   , discShort
-  , discSTRef
-  , discIORef
   , sdiscNat
+  , bdiscNat
+  -- , discSTRef
+  -- , discIORef
   ) where
 
 import Control.Arrow
 import Control.Monad
-import Data.Coerce
+import Data.Array as Array
 import Data.Functor
 import Data.Functor.Contravariant
 import Data.Functor.Contravariant.Divisible
 import Data.Int
 import Data.IORef (newIORef, atomicModifyIORef)
 import Data.Monoid hiding (Any)
-import Data.Primitive.Types (Addr(..))
-import Data.Primitive.ByteArray (MutableByteArray(MutableByteArray))
 import Data.Typeable
 import Data.Void
 import qualified Data.Vector.Mutable as UM
-import qualified Data.Vector.Primitive as P
-import qualified Data.Vector.Primitive.Mutable as PM
-import GHC.IO (IO(IO))
-import GHC.IORef (IORef(IORef))
-import GHC.Prim (Any, State#, RealWorld, MutableByteArray#, Int#)
-import GHC.STRef (STRef(STRef))
+import GHC.Prim (Any, RealWorld)
 import Prelude hiding (read)
 import System.IO.Unsafe
 import Unsafe.Coerce
+{-
+import Data.Coerce
+import Data.Primitive.Types (Addr(..))
+import GHC.IO (IO(IO))
+import qualified Data.Vector.Primitive as P
+import qualified Data.Vector.Primitive.Mutable as PM
+import Data.Primitive.ByteArray (MutableByteArray(MutableByteArray))
+import GHC.Prim (Any, State#, RealWorld, MutableByteArray#, Int#)
+import GHC.IORef (IORef(IORef))
+import GHC.STRef (STRef(STRef))
+-}
 
 -- | Discriminator
 --
@@ -77,8 +82,9 @@ instance Monoid (Disc a) where
   mempty = conquer
   mappend (Disc l) (Disc r) = Disc $ \xs -> l [ (fst x, x) | x <- xs ] >>= r
 
-descending :: Disc a -> Disc a
-descending (Disc l) = Disc (reverse . l)
+-- | Sort descending or partition in an anti-stable fashion
+desc :: Disc a -> Disc a
+desc (Disc l) = Disc (reverse . l)
 
 --------------------------------------------------------------------------------
 -- Primitives
@@ -103,8 +109,8 @@ discNat n = unsafePerformIO $ do
       [] -> (k:keys) <$ UM.write t k [v]
       _  -> keys     <$ UM.write t k (v:vs)
     step2 t vss k = do
-      elems <- UM.read t k
-      (reverse elems : vss) <$ UM.write t k []
+      es <- UM.read t k
+      (reverse es : vss) <$ UM.write t k []
     go ts xs = unsafePerformIO $ do
       mt <- atomicModifyIORef ts $ \case
         (y:ys) -> (ys, Just y)
@@ -118,13 +124,22 @@ discNat n = unsafePerformIO $ do
 {-# NOINLINE discNat #-}
 
 sdiscNat :: Int -> Disc Int
-sdiscNat = undefined
+sdiscNat n = Disc $ \xs -> filter (not . null) (bdiscNat n update xs) where
+  update vs v = v : vs
+{-# INLINE sdiscNat #-}
+
+bdiscNat :: Int -> ([v] -> v -> [v]) -> [(Int, v)] -> [[v]]
+bdiscNat n update xs = reverse <$> Array.elems (Array.accumArray update [] (0,n) xs)
+{-# INLINE bdiscNat #-}
 
 -- | Shared bucket set for small integers
 discShort :: Disc Int
 discShort = discNat 65536
 {-# NOINLINE discShort #-}
 
+-- TODO: Finish discrimination for IORefs and STRefs
+
+{-
 foreign import prim "walk" walk :: Any -> MutableByteArray# s -> State# s -> (# State# s, Int# #)
 
 discSTRef :: Disc Addr -> Disc (STRef s a)
@@ -141,4 +156,4 @@ discSTRef (Disc f) = Disc $ \xs ->
 
 discIORef :: forall a. Disc Addr -> Disc (IORef a)
 discIORef = coerce (discSTRef :: Disc Addr -> Disc (STRef RealWorld a))
-
+-}

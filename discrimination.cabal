@@ -34,18 +34,21 @@ library
   c-sources: cbits/prim.cmm
   exposed-modules:
     Data.Discrimination
-    Data.Discrimination.Key
-    Data.Discrimination.Order
-    Data.Discrimination.Ordered
     Data.Discrimination.Type
-    Data.Discrimination.Unordered
+    Data.Discrimination.Generic
+
+
+  -- Data.Discrimination.Disorder
+  -- Data.Discrimination.Order
 
   build-depends:
+    array,
     base >= 4.7 && < 5,
     bytestring,
     containers,
     contravariant >= 1.2,
     data-default,
+    deepseq < 1.5,
     ghc-prim,
     primitive,
     text,
