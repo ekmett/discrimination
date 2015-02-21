@@ -117,6 +117,11 @@ discNat n = unsafePerformIO $ do
     {-# NOINLINE go #-}
 {-# NOINLINE discNat #-}
 
+-- | Shared bucket set for small integers
+instance Disorderable Disc where
+  discShort = discNat 65536
+  {-# NOINLINE discShort #-}
+
 instance Orderable Disc where
   sdiscNat n = Disc $ \xs -> filter (not . null) (bdiscNat n update xs) where
     update vs v = v : vs
@@ -127,10 +132,6 @@ bdiscNat :: Int -> ([v] -> v -> [v]) -> [(Int,v)] -> [[v]]
 bdiscNat n update xs = reverse <$> Array.elems (Array.accumArray update [] (0,n) xs)
 {-# INLINE bdiscNat #-}
 
--- | Shared bucket set for small integers
-instance Disorderable Disc where
-  discShort = discNat 65536
-  {-# NOINLINE discShort #-}
 
 -- TODO: Finish discrimination for IORefs and STRefs
 

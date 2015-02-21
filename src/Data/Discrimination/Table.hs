@@ -8,6 +8,7 @@
 module Data.Discrimination.Table
   ( Table(..)
   , filterMap
+  , reverseTable
   ) where
 
 import Control.Applicative
@@ -23,6 +24,9 @@ data Table a = Table
   { count :: {-# UNPACK #-} !Int -- an opaque recognizer
   , runTable :: forall r. Monoid r => (a -> r) -> r
   }
+
+reverseTable :: Table a -> Table a
+reverseTable (Table n m) = Table n $ \k -> getDual $ m (Dual . k)
 
 instance Functor Table where
   fmap f (Table i m) = Table i $ \k -> m (k.f)
