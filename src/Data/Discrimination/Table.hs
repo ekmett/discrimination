@@ -16,6 +16,7 @@ import Control.Monad
 import Control.Monad.Fix
 import Control.Monad.Zip
 import Data.Foldable as Foldable
+import Data.Function (on)
 import Data.Monoid
 import Data.Traversable
 import GHC.Exts as Exts
@@ -24,6 +25,16 @@ data Table a = Table
   { count :: {-# UNPACK #-} !Int -- an opaque recognizer
   , runTable :: forall r. Monoid r => (a -> r) -> r
   }
+
+instance Show a => Show (Table a) where
+  showsPrec d t = showParen (d > 10) $ showString "fromList " . showsPrec 11 (Exts.toList t)
+
+instance Eq a => Eq (Table a) where
+  a@(Table n _) == b@(Table m _) = n == m && Exts.toList a == Exts.toList b
+
+instance Ord a => Ord (Table a) where
+  compare = on compare Exts.toList
+
 
 reverseTable :: Table a -> Table a
 reverseTable (Table n m) = Table n $ \k -> getDual $ m (Dual . k)
