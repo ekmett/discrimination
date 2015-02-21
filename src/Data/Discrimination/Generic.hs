@@ -17,6 +17,20 @@ import Data.Functor.Contravariant
 import Data.Functor.Contravariant.Divisible
 import GHC.Generics
 
+-- | Machinery for deconstructing an arbitrary 'Generic' instance using a 'Decidable' 'Contravariant' functor.
+class (Generic a, GDeciding q (Rep a)) => Deciding q a where
+  deciding :: (Deciding q a, Decidable f) => p q -> (forall b. q b => f b) -> f a
+
+instance (Generic a, GDeciding q (Rep a)) => Deciding q a  where
+  deciding p q = contramap from $ gdeciding p q
+
+-- | Machinery for deconstructing an arbitrary 'Generic1' instance using a 'Decidable' 'Contravariant' functor.
+class (Generic1 t, GDeciding1 q (Rep1 t)) => Deciding1 q t where
+  deciding1 :: (Deciding1 q t, Decidable f) => p q -> (forall b. q b => f b) -> f a -> f (t a)
+
+instance (Generic1 t, GDeciding1 q (Rep1 t)) => Deciding1 q t where
+  deciding1 p q r = contramap from1 $ gdeciding1 p q r
+
 class GDeciding q t where
   gdeciding :: Decidable f => p q -> (forall b. q b => f b) -> f (t a)
 
@@ -62,19 +76,7 @@ instance GDeciding1 q f => GDeciding1 q (M1 i c f) where
 instance GDeciding1 q Par1 where
   gdeciding1 _ _ r = contramap unPar1 r
 
-instance GDeciding1 q f => GDeciding1 q (Rec1 f) where 
-  gdeciding1 p q r = contramap unRec1 (gdeciding1 p q r)
+-- instance GDeciding1 q f => GDeciding1 q (Rec1 f) where gdeciding1 p q r = contramap unRec1 (gdeciding1 p q r)
 
--- | Machinery for deconstructing an arbitrary 'Generic' instance using a 'Decidable' 'Contravariant' functor.
-class (Generic a, GDeciding q (Rep a)) => Deciding q a where
-  deciding :: (Deciding q a, Decidable f) => p q -> (forall b. q b => f b) -> f a
-
-instance (Generic a, GDeciding q (Rep a)) => Deciding q a  where
-  deciding p q = contramap from $ gdeciding p q
-
--- | Machinery for deconstructing an arbitrary 'Generic1' instance using a 'Decidable' 'Contravariant' functor.
-class (Generic1 t, GDeciding1 q (Rep1 t)) => Deciding1 q t where
-  deciding1 :: (Deciding1 q t, Decidable f) => p q -> (forall b. q b => f b) -> f a -> f (t a)
-
-instance (Generic1 t, GDeciding1 q (Rep1 t)) => Deciding1 q t where
-  deciding1 p q r = contramap from1 $ gdeciding1 p q r
+instance Deciding1 q f => GDeciding1 q (Rec1 f) where 
+  gdeciding1 p q r = contramap unRec1 (deciding1 p q r)

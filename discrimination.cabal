@@ -34,6 +34,8 @@ library
   c-sources: cbits/prim.cmm
   exposed-modules:
     Data.Discrimination
+    Data.Discrimination.Class
+    Data.Discrimination.Combinators
     Data.Discrimination.Type
     Data.Discrimination.Generic
 
