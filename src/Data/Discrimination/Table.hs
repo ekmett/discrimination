@@ -6,9 +6,12 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 module Data.Discrimination.Table
-  ( Table(..)
+  ( Table(Table, runTable)
+  , table
   , filterMap
-  , reverseTable
+  , reverse
+  , null
+  , length
   ) where
 
 import Control.Applicative
@@ -20,6 +23,12 @@ import Data.Function (on)
 import Data.Monoid
 import Data.Traversable
 import GHC.Exts as Exts
+import Prelude hiding 
+  ( reverse
+#if __GLASGOW_HASKELL__ < 710
+  , null, length
+#endif
+  )
 
 data Table a = Table
   { count :: {-# UNPACK #-} !Int -- an opaque recognizer
@@ -35,9 +44,8 @@ instance Eq a => Eq (Table a) where
 instance Ord a => Ord (Table a) where
   compare = on compare Exts.toList
 
-
-reverseTable :: Table a -> Table a
-reverseTable (Table n m) = Table n $ \k -> getDual $ m (Dual . k)
+reverse :: Table a -> Table a
+reverse (Table n m) = Table n $ \k -> getDual $ m (Dual . k)
 
 instance Functor Table where
   fmap f (Table i m) = Table i $ \k -> m (k.f)
@@ -45,6 +53,19 @@ instance Functor Table where
 instance Foldable Table where
   foldMap f (Table _ m) = m f
   foldr f z (Table _ m) = m (Endo . f) `appEndo` z
+#if __GLASGOW_HASKELL__ >= 710
+  null t = count t == 0
+  length = count
+#endif
+
+#if __GLASGOW_HASKELL__ < 710
+null :: Table a -> Bool
+null t = count t == 0
+{-# INLINE null #-}
+
+length :: Table a -> Int
+length = count
+#endif
 
 instance Monoid (Table a) where
   mempty = Table 0 $ \_ -> mempty
@@ -87,12 +108,13 @@ rep y0 x0
       | y == 1 = mappend x z
       | otherwise = g (mappend x x) (quot (y - 1) 2) (mappend x z)
 
-bag :: (forall m. Monoid m => (a -> m) -> m) -> Table a
-bag k = Table (getSum $ k $ \_ -> Sum 1) k
+table :: (forall m. Monoid m => (a -> m) -> m) -> Table a
+table k = Table (getSum $ k $ \_ -> Sum 1) k
+{-# INLINE table #-}
 
 instance Monad Table where
   return a = Table 1 $ \k -> k a
-  as >>= f = bag $ \k -> runTable as $ \a -> runTable (f a) k
+  as >>= f = table $ \k -> runTable as $ \a -> runTable (f a) k
   (>>) = (*>)
   fail _ = empty
 
@@ -113,4 +135,5 @@ instance MonadFix Table where
   mfix a2ba = foldMap pure $ mfix (Foldable.toList . a2ba)
 
 filterMap :: (a -> Maybe b) -> Table a -> Table b
-filterMap f m = bag $ \k -> runTable m $ maybe mempty k . f
+filterMap f m = table $ \k -> runTable m $ maybe mempty k . f
+{-# INLINE filterMap #-}
