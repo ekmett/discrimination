@@ -49,10 +49,10 @@ instance Disorder Word32 where
   disorder = divide (\x -> let y = fromIntegral x in (unsafeShiftR y 16 .&. 65535, y .&. 65535)) discShort discShort
 
 instance Disorder Int8 where
-  disorder = contramap (subtract 128 . fromIntegral) discShort
+  disorder = contramap ((+128) . fromIntegral) discShort
 
 instance Disorder Int16 where
-  disorder = contramap (subtract 32768 . fromIntegral) discShort
+  disorder = contramap ((+32768) . fromIntegral) discShort
 
 instance Disorder Int32 where
   disorder = divide (\x -> let y = fromIntegral x - 2147483648 in (unsafeShiftR y 16 .&. 65535, y .&. 65535)) discShort discShort
