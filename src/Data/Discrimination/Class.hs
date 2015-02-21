@@ -30,7 +30,8 @@ class Decidable f => Disorderable f where
   -- | Discriminate integers 65536 values at a time without revealing ordering
   discShort :: f Int
 
-class Disorder a where
+-- | 'Eq' equipped with a compatible stable unordered discriminator.
+class Eq a => Disorder a where
   disorder :: Disorderable f => f a
   default disorder :: (Deciding Disorder a, Disorderable f) => f a
   disorder = deciding (Proxy :: Proxy Disorder) disorder
@@ -89,7 +90,8 @@ class Decidable f => Orderable f where
   -- | Reverse the ordering
   desc :: f a -> f a
 
-class Disorder a => Order a where
+-- | 'Ord' equipped with a compatible stable, ordered discriminator.
+class (Disorder a, Ord a) => Order a where
   order :: Orderable f => f a
   default order :: (Orderable f, Deciding Order a) => f a
   order = deciding (Proxy :: Proxy Order) order

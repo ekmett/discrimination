@@ -4,6 +4,7 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -18,6 +19,12 @@
 module Data.Discrimination.Type
   ( Disc(..)
   , discNat
+  , discBag
+  , discSet
+  , discColl
+  , sdiscBag
+  , sdiscSet
+  , sdiscColl
   , bdiscNat
   ) where
 
@@ -132,6 +139,49 @@ bdiscNat :: Int -> ([v] -> v -> [v]) -> [(Int,v)] -> [[v]]
 bdiscNat n update xs = reverse <$> Array.elems (Array.accumArray update [] (0,n) xs)
 {-# INLINE bdiscNat #-}
 
+sdiscColl :: ([Int] -> Int -> [Int]) -> Disc k -> Disc [k]
+sdiscColl update r = Disc $ \xss -> let 
+    (kss, vs)           = unzip xss
+    elemKeyNumAssocs    = groupNum kss
+    keyNumBlocks        = r % elemKeyNumAssocs
+    keyNumElemNumAssocs = groupNum keyNumBlocks
+    sigs                = bdiscNat (length kss) update keyNumElemNumAssocs
+    yss                 = zip sigs vs
+  in order1 (sdiscNat (length keyNumBlocks)) % yss
+
+groupNum :: [[k]] -> [(k,Int)]
+groupNum kss = concat [ (,n) <$> ks | n <- [0..] | ks <- kss ]
+
+sdiscBag :: Disc k -> Disc [k]
+sdiscBag = sdiscColl updateBag
+
+sdiscSet :: Disc k -> Disc [k]
+sdiscSet = sdiscColl updateSet
+
+discColl :: ([Int] -> Int -> [Int]) -> Disc k -> Disc [k]
+discColl update r = Disc $ \xss -> let 
+    (kss, vs)           = unzip xss
+    elemKeyNumAssocs    = groupNum kss
+    keyNumBlocks        = r % elemKeyNumAssocs
+    keyNumElemNumAssocs = groupNum keyNumBlocks
+    sigs                = bdiscNat (length kss) update keyNumElemNumAssocs
+    yss                 = zip sigs vs
+  in disorder1 (discNat (length keyNumBlocks)) % yss
+
+discBag :: Disc k -> Disc [k]
+discBag = discColl updateBag
+
+discSet :: Disc k -> Disc [k]
+discSet = discColl updateSet
+
+updateBag :: [Int] -> Int -> [Int]
+updateBag vs v = v : vs
+
+updateSet :: [Int] -> Int -> [Int]
+updateSet [] w = [w]
+updateSet vs@(v:_) w 
+  | v == w    = vs
+  | otherwise = w : vs
 
 -- TODO: Finish discrimination for IORefs and STRefs
 
