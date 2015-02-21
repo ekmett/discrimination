@@ -32,6 +32,7 @@ import Control.Arrow
 import Control.Monad
 import Data.Array as Array
 import Data.Discrimination.Class
+import Data.Foldable
 import Data.Functor
 import Data.Functor.Contravariant
 import Data.Functor.Contravariant.Divisible
@@ -42,7 +43,7 @@ import Data.Typeable
 import Data.Void
 import qualified Data.Vector.Mutable as UM
 import GHC.Prim (Any, RealWorld)
-import Prelude hiding (read)
+import Prelude hiding (read, concat)
 import System.IO.Unsafe
 import Unsafe.Coerce
 {-
@@ -139,10 +140,10 @@ bdiscNat :: Int -> ([v] -> v -> [v]) -> [(Int,v)] -> [[v]]
 bdiscNat n update xs = reverse <$> Array.elems (Array.accumArray update [] (0,n) xs)
 {-# INLINE bdiscNat #-}
 
-sdiscColl :: ([Int] -> Int -> [Int]) -> Disc k -> Disc [k]
+sdiscColl :: Foldable f => ([Int] -> Int -> [Int]) -> Disc k -> Disc (f k)
 sdiscColl update r = Disc $ \xss -> let 
     (kss, vs)           = unzip xss
-    elemKeyNumAssocs    = groupNum kss
+    elemKeyNumAssocs    = groupNum (toList <$> kss)
     keyNumBlocks        = r % elemKeyNumAssocs
     keyNumElemNumAssocs = groupNum keyNumBlocks
     sigs                = bdiscNat (length kss) update keyNumElemNumAssocs
@@ -158,10 +159,10 @@ sdiscBag = sdiscColl updateBag
 sdiscSet :: Disc k -> Disc [k]
 sdiscSet = sdiscColl updateSet
 
-discColl :: ([Int] -> Int -> [Int]) -> Disc k -> Disc [k]
+discColl :: Foldable f => ([Int] -> Int -> [Int]) -> Disc k -> Disc (f k)
 discColl update r = Disc $ \xss -> let 
     (kss, vs)           = unzip xss
-    elemKeyNumAssocs    = groupNum kss
+    elemKeyNumAssocs    = groupNum (toList <$> kss)
     keyNumBlocks        = r % elemKeyNumAssocs
     keyNumElemNumAssocs = groupNum keyNumBlocks
     sigs                = bdiscNat (length kss) update keyNumElemNumAssocs

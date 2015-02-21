@@ -31,7 +31,7 @@ class Decidable f => Disorderable f where
   discShort :: f Int
 
 -- | 'Eq' equipped with a compatible stable unordered discriminator.
-class Eq a => Disorder a where
+class Disorder a where
   disorder :: Disorderable f => f a
   default disorder :: (Deciding Disorder a, Disorderable f) => f a
   disorder = deciding (Proxy :: Proxy Disorder) disorder
@@ -91,7 +91,7 @@ class Decidable f => Orderable f where
   desc :: f a -> f a
 
 -- | 'Ord' equipped with a compatible stable, ordered discriminator.
-class (Disorder a, Ord a) => Order a where
+class Disorder a => Order a where
   order :: Orderable f => f a
   default order :: (Orderable f, Deciding Order a) => f a
   order = deciding (Proxy :: Proxy Order) order
