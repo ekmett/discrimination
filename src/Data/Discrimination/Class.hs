@@ -46,7 +46,13 @@ instance Disorder Word16 where
   disorder = contramap fromIntegral discShort 
 
 instance Disorder Word32 where
-  disorder = divide (\x -> let y = fromIntegral x in (unsafeShiftR y 16 .&. 65535, y .&. 65535)) discShort discShort
+  disorder = divide (\x -> (fromIntegral (unsafeShiftR x 16), fromIntegral x)) discShort discShort
+
+instance Disorder Word64 where
+  disorder = divide (\x -> (fromIntegral (unsafeShiftR x 32) :: Word32, fromIntegral x :: Word32)) disorder disorder
+
+instance Disorder Word where
+  disorder = divide (\x -> (fromIntegral (unsafeShiftR x 32) :: Word32, fromIntegral x :: Word32)) disorder disorder
 
 instance Disorder Int8 where
   disorder = contramap ((+128) . fromIntegral) discShort
@@ -55,7 +61,13 @@ instance Disorder Int16 where
   disorder = contramap ((+32768) . fromIntegral) discShort
 
 instance Disorder Int32 where
-  disorder = divide (\x -> let y = fromIntegral x - 2147483648 in (unsafeShiftR y 16 .&. 65535, y .&. 65535)) discShort discShort
+  disorder = divide (\x -> let y = fromIntegral (x - minBound) in (unsafeShiftR y 16, y)) discShort discShort
+
+instance Disorder Int64 where
+  disorder = contramap (\x -> fromIntegral (x - minBound) :: Word64) disorder
+
+instance Disorder Int where
+  disorder = contramap (\x -> fromIntegral (x - minBound) :: Word) disorder
 
 instance Disorder Bool
 instance (Disorder a, Disorder b) => Disorder (a, b)
@@ -101,6 +113,32 @@ instance Order Word8 where
 
 instance Order Word16 where
   order = contramap fromIntegral (sdiscNat 65536)
+
+instance Order Word32 where
+  order = divide (\x -> (fromIntegral (unsafeShiftR x 16), fromIntegral x)) (sdiscNat 65536) (sdiscNat 65536)
+
+instance Order Word64 where
+  order = divide (\x -> (fromIntegral (unsafeShiftR x 32) :: Word32, fromIntegral x :: Word32)) order order
+
+instance Order Word where
+  order = divide (\x -> (fromIntegral (unsafeShiftR x 32) :: Word32, fromIntegral x :: Word32)) order order
+
+instance Order Int8 where
+  order = contramap ((+128) . fromIntegral) (sdiscNat 256)
+
+instance Order Int16 where
+  order = contramap ((+32768) . fromIntegral) (sdiscNat 65536)
+
+instance Order Int32 where
+  order = divide (\x -> let y = fromIntegral (x - minBound) in (unsafeShiftR y 16, y)) (sdiscNat 65536) (sdiscNat 65536)
+
+instance Order Int64 where
+  order = contramap (\x -> fromIntegral (x - minBound) :: Word64) order
+
+instance Order Int where
+  order = contramap (\x -> fromIntegral (x - minBound) :: Word) order
+
+-- TODO: Integer and Natural?
 
 instance Order Void
 instance Order Bool
