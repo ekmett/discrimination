@@ -14,6 +14,7 @@ module Data.Discrimination.Class
   ) where
 
 import Data.Bits
+import Data.Complex
 import Data.Discrimination.Generic
 import Data.Functor.Compose
 import Data.Functor.Contravariant
@@ -76,6 +77,8 @@ instance (Disorder a, Disorder b, Disorder c, Disorder d) => Disorder (a, b, c, 
 instance Disorder a => Disorder [a]
 instance Disorder a => Disorder (Maybe a)
 instance (Disorder a, Disorder b) => Disorder (Either a b)
+instance Disorder a => Disorder (Complex a) where
+  disorder = divide (\(a :+ b) -> (a, b)) disorder disorder
 instance (Disorder1 f, Disorder1 g, Disorder a) => Disorder (Compose f g a) where
   disorder = getCompose `contramap` disorder1 (disorder1 disorder)
 
@@ -92,6 +95,8 @@ instance (Disorder a, Disorder b) => Disorder1 ((,,) a b)
 instance (Disorder a, Disorder b, Disorder c) => Disorder1 ((,,,) a b c)
 instance (Disorder1 f, Disorder1 g) => Disorder1 (Compose f g) where
   disorder1 f = getCompose `contramap` disorder1 (disorder1 f)
+instance Disorder1 Complex where
+  disorder1 f = divide (\(a :+ b) -> (a, b)) f f
 
 -- * Ordered Discrimination
 
