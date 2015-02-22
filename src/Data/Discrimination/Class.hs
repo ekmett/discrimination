@@ -15,6 +15,7 @@ module Data.Discrimination.Class
 
 import Data.Bits
 import Data.Complex
+import Data.Ratio
 import Data.Discrimination.Generic
 import Data.Functor.Compose
 import Data.Functor.Contravariant
@@ -79,6 +80,8 @@ instance Disorder a => Disorder (Maybe a)
 instance (Disorder a, Disorder b) => Disorder (Either a b)
 instance Disorder a => Disorder (Complex a) where
   disorder = divide (\(a :+ b) -> (a, b)) disorder disorder
+instance (Disorder a, Integral a) => Disorder (Ratio a) where
+  disorder = divide (\r -> (numerator r, denominator r)) disorder disorder
 instance (Disorder1 f, Disorder1 g, Disorder a) => Disorder (Compose f g a) where
   disorder = getCompose `contramap` disorder1 (disorder1 disorder)
 
