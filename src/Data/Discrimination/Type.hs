@@ -59,7 +59,7 @@ import GHC.STRef (STRef(STRef))
 -}
 
 -- | Discriminator
---
+
 -- TODO: use [(a,b)] -> [NonEmpty b] to better indicate safety?
 newtype Disc a = Disc { (%) :: forall b. [(a,b)] -> [[b]] }
   deriving Typeable
