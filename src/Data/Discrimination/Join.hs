@@ -67,16 +67,16 @@ short :: Int
 short = 65556
 
 -- | Shared bucket set for small integers
-instance Disorderable Join where
+instance Grouped Join where
   discShort = unsafePerformIO $ do
     ts <- newIORef ([] :: [UM.MVector RealWorld ([Any],[Any])])
     return $ Join $ go ts
     where
       -- inner joins
-      inner1 t ad v 
-        | k <- ad v = do
-          (vs,[]) <- UM.read t k 
-          UM.write t k (v:vs,[])
+      inner1 t ad keys v 
+        | k <- ad v = UM.read t k >>= \case
+          ([], []) -> (k:keys) <$ UM.write t k ([v],[])
+          (vs, us) -> keys     <$ UM.write t k (v:vs, us)
       inner2 t bd keys v 
         | k <- bd v = UM.read t k >>= \case
           (us@(_:_),[]) -> (k:keys) <$ UM.write t k (us,[v])
@@ -112,33 +112,45 @@ instance Disorderable Join where
         | k <- ad v = UM.read t k >>= \case
           (_ , []) -> return ()
           (vs, us) -> UM.write t k (v:vs, us)
+
         
       -- cleanup
       cleanup t abc vss k = do
         (es,fs) <- UM.read t k
         (abc (reverse $ fromList es) (reverse $ fromList fs) : vss) <$ UM.write t k ([],[])
+
+      cleanup_ t k = UM.write t k ([],[])
+
+      -- cleanup without cleanup
+      gather t abc vss k = do
+        (es, fs) <- UM.read t k
+        return $ abc (reverse $ fromList es) (reverse $ fromList fs) : vss
+
       go ts mode abc ad bd ls rs = unsafePerformIO $ do
         mt <- atomicModifyIORef ts $ \case
           (y:ys) -> (ys, Just y)
           []     -> ([], Nothing)
         t <- maybe (UM.replicate short ([],[])) (return . unsafeCoerce) mt
         -- inner join
-        lrs <- case mode of
+        js <- case mode of
           Inner -> do
-            traverse_ (inner1 t ad) ls
-            foldlM (inner2 t bd) [] rs
+            mess <- foldlM (inner1 t ad) [] ls
+            keys <- foldlM (inner2 t bd) [] rs
+            js <- foldM (gather t abc) [] keys
+            traverse_ (cleanup_ t) mess
+            return js
           Outer -> do
             xs <- foldlM (outer1 t ad) [] ls
-            foldlM (outer2 t bd) xs rs
+            lrs <- foldlM (outer2 t bd) xs rs
+            foldM (cleanup t abc) [] lrs
           LeftOuter -> do
             xs <- foldlM (left1 t ad) [] ls
             traverse_ (left2 t bd) rs
-            return xs
+            foldM (cleanup t abc) [] xs
           RightOuter -> do
             xs <- foldlM (right1 t bd) [] rs
             traverse_ (right2 t ad) ls
-            return xs
-        js <- foldM (cleanup t abc) [] lrs
+            foldM (cleanup t abc) [] xs
         atomicModifyIORef ts $ \ts0 -> (unsafeCoerce t:ts0, ())
         return js
       {-# NOINLINE go #-}
@@ -147,17 +159,17 @@ instance Disorderable Join where
 -- TODO: instance Orderable Join where
 
 inner
-  :: Disorder d
+  :: Grouping d
   => (a -> b -> c)
   -> (a -> d)
   -> (b -> d)
   -> Table a
   -> Table b
   -> [Table c]
-inner f = runJoin disorder Inner (liftA2 f) 
+inner f = runJoin grouping Inner (liftA2 f) 
 
 outer
-  :: Disorder d
+  :: Grouping d
   => (a -> b -> c)
   -> (a -> c)
   -> (b -> c) 
@@ -166,7 +178,7 @@ outer
   -> Table a
   -> Table b
   -> [Table c]
-outer f g h = runJoin disorder Outer $ \ls rs ->
+outer f g h = runJoin grouping Outer $ \ls rs ->
   if null rs
   then g <$> ls
   else if null ls
@@ -174,7 +186,7 @@ outer f g h = runJoin disorder Outer $ \ls rs ->
        else f <$> ls <*> rs
 
 leftOuter
-  :: Disorder d
+  :: Grouping d
   => (a -> b -> c)
   -> (a -> c)
   -> (a -> d)
@@ -182,13 +194,13 @@ leftOuter
   -> Table a
   -> Table b
   -> [Table c]
-leftOuter f g = runJoin disorder LeftOuter $ \ls rs ->
+leftOuter f g = runJoin grouping LeftOuter $ \ls rs ->
   if null rs 
   then g <$> ls
   else f <$> ls <*> rs
 
 rightOuter
-  :: Disorder d
+  :: Grouping d
   => (a -> b -> c)
   -> (b -> c)
   -> (a -> d)
@@ -196,7 +208,7 @@ rightOuter
   -> Table a
   -> Table b
   -> [Table c]
-rightOuter f g = runJoin disorder RightOuter $ \ls rs ->
+rightOuter f g = runJoin grouping RightOuter $ \ls rs ->
   if null ls 
   then g <$> rs
   else f <$> ls <*> rs

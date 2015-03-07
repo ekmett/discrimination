@@ -9,12 +9,12 @@ module Data.Discrimination
   , leftOuter
   , rightOuter
   -- * Data.Discrimination.Class
-  , Disorderable
-  , Disorder(..)
-  , Disorder1(..)
-  , Orderable
-  , Order(..)
-  , Order1(..)
+  , Grouped(..)
+  , Grouping(..)
+  , Grouping1(..)
+  , Sorted(..)
+  , Sorting(..)
+  , Sorting1(..)
   -- * Data.Discrimination.Table
   , Table(..)
   -- * Other Modules

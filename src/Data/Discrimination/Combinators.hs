@@ -16,12 +16,12 @@ import Data.Discrimination.Type
 -- @
 -- 'group' = 'groupWith' 'id'
 -- @
-group :: Disorder a => [a] -> [[a]]
-group as = disorder % [(a, a) | a <- as]
+group :: Grouping a => [a] -> [[a]]
+group as = grouping % [(a, a) | a <- as]
 
 -- | Replaces 'GHC.Exts.groupWith' using discrimination. The result is not sorted.
-groupWith :: Disorder b => (a -> b) -> [a] -> [[a]]
-groupWith f as = disorder % [(f a, a) | a <- as]
+groupWith :: Grouping b => (a -> b) -> [a] -> [[a]]
+groupWith f as = grouping % [(f a, a) | a <- as]
 
 -- | This linear time replacement for 'Data.List.nub' from @Data.List@ uses discrimination.
 --
@@ -29,14 +29,14 @@ groupWith f as = disorder % [(f a, a) | a <- as]
 -- 'nub' = 'nubWith' 'id'
 -- 'nub' as = 'head' 'Control.Applicative.<$>' 'group' as
 -- @
-nub :: Disorder a => [a] -> [a]
+nub :: Grouping a => [a] -> [a]
 nub as = head <$> group as
 
 -- |
 -- @
 -- 'nubWith' f as = 'head' 'Control.Applicative.<$>' 'groupWith' f as
 -- @
-nubWith :: Disorder b => (a -> b) -> [a] -> [a]
+nubWith :: Grouping b => (a -> b) -> [a] -> [a]
 nubWith f as = head <$> groupWith f as
 
 -- | This linear time replacement for 'Data.List.sort' uses discrimination.
@@ -44,9 +44,9 @@ nubWith f as = head <$> groupWith f as
 -- @
 -- 'sort' = 'sortWith' 'id'
 -- @
-sort :: Order a => [a] -> [a]
-sort as = concat $ order % [ (a,a) | a <- as ]
+sort :: Sorting a => [a] -> [a]
+sort as = concat $ sorting % [ (a,a) | a <- as ]
 
 -- | This linear time replacement for 'GHC.Exts.sortWith' and 'Data.List.sortOn' uses discrimination.
-sortWith :: Order b => (a -> b) -> [a] -> [a]
-sortWith f as = concat $ order % [ (f a, a) | a <- as ]
+sortWith :: Sorting b => (a -> b) -> [a] -> [a]
+sortWith f as = concat $ sorting % [ (f a, a) | a <- as ]

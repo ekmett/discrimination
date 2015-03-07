@@ -126,11 +126,11 @@ discNat n = unsafePerformIO $ do
 {-# NOINLINE discNat #-}
 
 -- | Shared bucket set for small integers
-instance Disorderable Disc where
+instance Grouped Disc where
   discShort = discNat 65536
   {-# NOINLINE discShort #-}
 
-instance Orderable Disc where
+instance Sorted Disc where
   sdiscNat n = Disc $ \xs -> filter (not . null) (bdiscNat n update xs) where
     update vs v = v : vs
   desc (Disc l) = Disc (reverse . l)
@@ -148,7 +148,7 @@ sdiscColl update r = Disc $ \xss -> let
     keyNumElemNumAssocs = groupNum keyNumBlocks
     sigs                = bdiscNat (length kss) update keyNumElemNumAssocs
     yss                 = zip sigs vs
-  in filter (not . null) $ order1 (sdiscNat (length keyNumBlocks)) % yss
+  in filter (not . null) $ sorting1 (sdiscNat (length keyNumBlocks)) % yss
 
 groupNum :: [[k]] -> [(k,Int)]
 groupNum kss = concat [ (,n) <$> ks | n <- [0..] | ks <- kss ]
@@ -167,7 +167,7 @@ discColl update r = Disc $ \xss -> let
     keyNumElemNumAssocs = groupNum keyNumBlocks
     sigs                = bdiscNat (length kss) update keyNumElemNumAssocs
     yss                 = zip sigs vs
-  in filter (not . null) $ disorder1 (discNat (length keyNumBlocks)) % yss
+  in filter (not . null) $ grouping1 (discNat (length keyNumBlocks)) % yss
 
 discBag :: Disc k -> Disc [k]
 discBag = discColl updateBag
