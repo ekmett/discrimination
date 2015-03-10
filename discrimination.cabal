@@ -17,7 +17,6 @@ description:   Fast generic linear-time discrimination and sorting
 
 extra-source-files:
   .gitignore
-  HLint.hs
   CHANGELOG.markdown
   README.markdown
 
