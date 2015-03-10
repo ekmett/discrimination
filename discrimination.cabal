@@ -16,9 +16,7 @@ synopsis:      Fast generic linear-time discrimination and sorting
 description:   Fast generic linear-time discrimination and sorting
 
 extra-source-files:
-  .ghci
   .gitignore
-  .vim.custom
   HLint.hs
   CHANGELOG.markdown
   README.markdown
