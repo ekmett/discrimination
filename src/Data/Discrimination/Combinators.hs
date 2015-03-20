@@ -17,11 +17,11 @@ import Data.Discrimination.Type
 -- 'group' = 'groupWith' 'id'
 -- @
 group :: Grouping a => [a] -> [[a]]
-group as = grouping % [(a, a) | a <- as]
+group as = runDisc grouping [(a, a) | a <- as]
 
 -- | Replaces 'GHC.Exts.groupWith' using discrimination. The result is not sorted.
 groupWith :: Grouping b => (a -> b) -> [a] -> [[a]]
-groupWith f as = grouping % [(f a, a) | a <- as]
+groupWith f as = runDisc grouping [(f a, a) | a <- as]
 
 -- | This linear time replacement for 'Data.List.nub' from @Data.List@ uses discrimination.
 --
@@ -45,8 +45,8 @@ nubWith f as = head <$> groupWith f as
 -- 'sort' = 'sortWith' 'id'
 -- @
 sort :: Sorting a => [a] -> [a]
-sort as = concat $ sorting % [ (a,a) | a <- as ]
+sort as = concat $ runDisc sorting [ (a,a) | a <- as ]
 
 -- | This linear time replacement for 'GHC.Exts.sortWith' and 'Data.List.sortOn' uses discrimination.
 sortWith :: Sorting b => (a -> b) -> [a] -> [a]
-sortWith f as = concat $ sorting % [ (f a, a) | a <- as ]
+sortWith f as = concat $ runDisc sorting [ (f a, a) | a <- as ]

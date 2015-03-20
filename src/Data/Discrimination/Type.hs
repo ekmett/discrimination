@@ -61,13 +61,10 @@ import GHC.STRef (STRef(STRef))
 -- | Discriminator
 
 -- TODO: use [(a,b)] -> [NonEmpty b] to better indicate safety?
-newtype Disc a = Disc { (%) :: forall b. [(a,b)] -> [[b]] }
+newtype Disc a = Disc { runDisc :: forall b. [(a,b)] -> [[b]] }
   deriving Typeable
 
 type role Disc representational
-
-
-infixr 9 %
 
 instance Contravariant Disc where
   contramap f (Disc g) = Disc $ g . map (first f)
@@ -144,11 +141,11 @@ sdiscColl :: Foldable f => ([Int] -> Int -> [Int]) -> Disc k -> Disc (f k)
 sdiscColl update r = Disc $ \xss -> let 
     (kss, vs)           = unzip xss
     elemKeyNumAssocs    = groupNum (toList <$> kss)
-    keyNumBlocks        = r % elemKeyNumAssocs
+    keyNumBlocks        = runDisc r elemKeyNumAssocs
     keyNumElemNumAssocs = groupNum keyNumBlocks
     sigs                = bdiscNat (length kss) update keyNumElemNumAssocs
     yss                 = zip sigs vs
-  in filter (not . null) $ sorting1 (sdiscNat (length keyNumBlocks)) % yss
+  in filter (not . null) $ sorting1 (sdiscNat (length keyNumBlocks)) `runDisc` yss
 
 groupNum :: [[k]] -> [(k,Int)]
 groupNum kss = concat [ (,n) <$> ks | n <- [0..] | ks <- kss ]
@@ -163,11 +160,11 @@ discColl :: Foldable f => ([Int] -> Int -> [Int]) -> Disc k -> Disc (f k)
 discColl update r = Disc $ \xss -> let 
     (kss, vs)           = unzip xss
     elemKeyNumAssocs    = groupNum (toList <$> kss)
-    keyNumBlocks        = r % elemKeyNumAssocs
+    keyNumBlocks        = runDisc r elemKeyNumAssocs
     keyNumElemNumAssocs = groupNum keyNumBlocks
     sigs                = bdiscNat (length kss) update keyNumElemNumAssocs
     yss                 = zip sigs vs
-  in filter (not . null) $ grouping1 (discNat (length keyNumBlocks)) % yss
+  in filter (not . null) $ grouping1 (discNat (length keyNumBlocks)) `runDisc` yss
 
 discBag :: Disc k -> Disc [k]
 discBag = discColl updateBag
