@@ -11,7 +11,6 @@ module Data.Discrimination.Combinators
   ) where
 
 import Control.Applicative
-import Control.Arrow
 import Data.Discrimination.Class
 import Data.Discrimination.Type
 import Data.IntMap.Lazy as IntMap
@@ -162,10 +161,10 @@ toIntMapWithKey f kvs0 = IntMap.fromDistinctAscList $ go <$> runDisc sorting [ (
 --
 -- This is an asymptotically faster version of 'Data.Set.fromList', which exploits ordered discrimination.
 toSet :: Sorting k => [k] -> Set k
-toSet kvs = undefined -- Set.fromDistinctAscList $ runDisc sorting [ (kv, kv) | kv <- kvs ] >>= last
+toSet kvs = Set.fromDistinctAscList $ last <$> runDisc sorting [ (kv, kv) | kv <- kvs ]
 
 -- | Construct an 'IntSet' in linear time.
 --
 -- This is an asymptotically faster version of 'Data.IntSet.fromList', which exploits ordered discrimination.
-toIntSet :: [k] -> IntSet
-toIntSet kvs = undefined -- IntSet.fromDistinctAscList $ runDisc sorting [ (kv, kv) | kv <- kvs ] >>= last
+toIntSet :: [Int] -> IntSet
+toIntSet kvs = IntSet.fromDistinctAscList $ last <$> runDisc sorting [ (kv, kv) | kv <- kvs ]
