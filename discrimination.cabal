@@ -34,11 +34,13 @@ library
     Data.Discrimination.Class
     Data.Discrimination.Combinators
     Data.Discrimination.Join
+    Data.Discrimination.Key
     Data.Discrimination.Table
     Data.Discrimination.Type
     Data.Discrimination.Generic
 
   build-depends:
+    adjunctions,
     array,
     base >= 4.7 && < 5,
     bytestring,
