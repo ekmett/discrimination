@@ -41,19 +41,26 @@ instance Grouping Void where
   grouping = lose id
 
 instance Grouping Word8 where
-  grouping = contramap fromIntegral discShort 
+  grouping = contramap fromIntegral discShort
 
 instance Grouping Word16 where
-  grouping = contramap fromIntegral discShort 
+  grouping = contramap fromIntegral discShort
 
 instance Grouping Word32 where
-  grouping = divide (\x -> (fromIntegral (unsafeShiftR x 16), fromIntegral x)) discShort discShort
+  grouping = divide (\x -> (fromIntegral (unsafeShiftR x 16), fromIntegral x .&. 0xffff)) discShort discShort
 
 instance Grouping Word64 where
-  grouping = divide (\x -> (fromIntegral (unsafeShiftR x 32) :: Word32, fromIntegral x :: Word32)) grouping grouping
+  grouping = divide (\x -> ((fromIntegral (shiftR x 48) .&. 0xffff, fromIntegral (shiftR x 32) .&. 0xffff),
+                            (fromIntegral (unsafeShiftR x 16) .&. 0xffff, fromIntegral x .&. 0xffff)))
+                           (divide id discShort discShort) (divide id discShort discShort)
 
 instance Grouping Word where
-  grouping = divide (\x -> (fromIntegral (unsafeShiftR x 32) :: Word32, fromIntegral x :: Word32)) grouping grouping
+  grouping
+    | (maxBound :: Word) == 4294967295
+                = divide (\x -> (fromIntegral (unsafeShiftR x 16) .&. 0xffff, fromIntegral x .&. 0xffff)) discShort discShort
+    | otherwise = divide (\x -> ((fromIntegral (shiftR x 48) .&. 0xffff, fromIntegral (shiftR x 32) .&. 0xffff),
+                                 (fromIntegral (unsafeShiftR x 16) .&. 0xffff, fromIntegral x .&. 0xffff)))
+                                (divide id discShort discShort) (divide id discShort discShort)
 
 instance Grouping Int8 where
   grouping = contramap (\x -> fromIntegral x + 128) discShort
@@ -62,7 +69,7 @@ instance Grouping Int16 where
   grouping = contramap (\x -> fromIntegral x + 32768) discShort
 
 instance Grouping Int32 where
-  grouping = divide (\x -> let y = fromIntegral (x - minBound) in (unsafeShiftR y 16, y)) discShort discShort
+  grouping = divide (\x -> let y = fromIntegral (x - minBound) in (unsafeShiftR y 16, y .&. 0xffff)) discShort discShort
 
 instance Grouping Int64 where
   grouping = contramap (\x -> fromIntegral (x - minBound) :: Word64) grouping
@@ -122,22 +129,31 @@ instance Sorting Word16 where
   sorting = contramap fromIntegral (sdiscNat 65536)
 
 instance Sorting Word32 where
-  sorting = divide (\x -> (fromIntegral (unsafeShiftR x 16), fromIntegral x)) (sdiscNat 65536) (sdiscNat 65536)
+  sorting = divide (\x -> ((fromIntegral (shiftR x 48) .&. 0xffff, fromIntegral (shiftR x 32) .&. 0xffff),
+                            (fromIntegral (unsafeShiftR x 16) .&. 0xffff, fromIntegral x .&. 0xffff))) go go where
+    go = divide id (sdiscNat 65536) (sdiscNat 65536)
 
 instance Sorting Word64 where
-  sorting = divide (\x -> (fromIntegral (unsafeShiftR x 32) :: Word32, fromIntegral x :: Word32)) sorting sorting
+  sorting = divide (\x -> ((fromIntegral (shiftR x 48) .&. 0xffff, fromIntegral (shiftR x 32) .&. 0xffff),
+                            (fromIntegral (unsafeShiftR x 16) .&. 0xffff, fromIntegral x .&. 0xffff))) go go where
+    go = divide id (sdiscNat 65536) (sdiscNat 65536)
 
 instance Sorting Word where
-  sorting = divide (\x -> (fromIntegral (unsafeShiftR x 32) :: Word32, fromIntegral x :: Word32)) sorting sorting
+  sorting
+    | (maxBound :: Word) == 4294967295
+                = divide (\x -> (fromIntegral (unsafeShiftR x 16) .&. 0xffff, fromIntegral x .&. 0xffff)) (sdiscNat 65536) (sdiscNat 65536)
+    | otherwise = divide (\x -> ((fromIntegral (shiftR x 48) .&. 0xffff, fromIntegral (shiftR x 32) .&. 0xffff),
+                                 (fromIntegral (unsafeShiftR x 16) .&. 0xffff, fromIntegral x .&. 0xffff))) go go where
+    go = divide id (sdiscNat 65536) (sdiscNat 65536)
 
 instance Sorting Int8 where
-  sorting = contramap ((+128) . fromIntegral) (sdiscNat 256)
+  sorting = contramap (\x -> fromIntegral (x - minBound)) (sdiscNat 256)
 
 instance Sorting Int16 where
-  sorting = contramap ((+32768) . fromIntegral) (sdiscNat 65536)
+  sorting = contramap (\x -> fromIntegral (x - minBound)) (sdiscNat 65536)
 
 instance Sorting Int32 where
-  sorting = divide (\x -> let y = fromIntegral (x - minBound) in (unsafeShiftR y 16, y)) (sdiscNat 65536) (sdiscNat 65536)
+  sorting = contramap (\x -> fromIntegral (x - minBound) :: Word32) sorting
 
 instance Sorting Int64 where
   sorting = contramap (\x -> fromIntegral (x - minBound) :: Word64) sorting
