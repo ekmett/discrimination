@@ -19,20 +19,15 @@
 module Data.Discrimination.Type
   ( Disc(..)
   , discNat
-  , discBag
-  , discSet
-  , discColl
-  , sdiscBag
-  , sdiscSet
-  , sdiscColl
+  , discShort
+  , sdiscNat
   , bdiscNat
+  , desc
   ) where
 
 import Control.Arrow
 import Control.Monad
 import Data.Array as Array
-import Data.Discrimination.Class
-import Data.Foldable
 import Data.Functor
 import Data.Functor.Contravariant
 import Data.Functor.Contravariant.Divisible
@@ -123,63 +118,21 @@ discNat n = unsafePerformIO $ do
 {-# NOINLINE discNat #-}
 
 -- | Shared bucket set for small integers
-instance Grouped Disc where
-  discShort = discNat 65536
-  {-# NOINLINE discShort #-}
+discShort :: Disc Int
+discShort = discNat 65536
+{-# NOINLINE discShort #-}
 
-instance Sorted Disc where
-  sdiscNat n = Disc $ \xs -> filter (not . null) (bdiscNat n update xs) where
-    update vs v = v : vs
-  desc (Disc l) = Disc (reverse . l)
-  {-# INLINE sdiscNat #-}
+sdiscNat :: Int -> Disc Int
+sdiscNat n = Disc $ \xs -> filter (not . null) (bdiscNat n update xs) where
+  update vs v = v : vs
+{-# INLINE sdiscNat #-}
+
+desc :: Disc a -> Disc a
+desc (Disc l) = Disc (reverse . l)
 
 bdiscNat :: Int -> ([v] -> v -> [v]) -> [(Int,v)] -> [[v]]
 bdiscNat n update xs = reverse <$> Array.elems (Array.accumArray update [] (0,n) xs)
 {-# INLINE bdiscNat #-}
-
-sdiscColl :: Foldable f => ([Int] -> Int -> [Int]) -> Disc k -> Disc (f k)
-sdiscColl update r = Disc $ \xss -> let 
-    (kss, vs)           = unzip xss
-    elemKeyNumAssocs    = groupNum (toList <$> kss)
-    keyNumBlocks        = runDisc r elemKeyNumAssocs
-    keyNumElemNumAssocs = groupNum keyNumBlocks
-    sigs                = bdiscNat (length kss) update keyNumElemNumAssocs
-    yss                 = zip sigs vs
-  in filter (not . null) $ sorting1 (sdiscNat (length keyNumBlocks)) `runDisc` yss
-
-groupNum :: [[k]] -> [(k,Int)]
-groupNum kss = concat [ (,n) <$> ks | n <- [0..] | ks <- kss ]
-
-sdiscBag :: Disc k -> Disc [k]
-sdiscBag = sdiscColl updateBag
-
-sdiscSet :: Disc k -> Disc [k]
-sdiscSet = sdiscColl updateSet
-
-discColl :: Foldable f => ([Int] -> Int -> [Int]) -> Disc k -> Disc (f k)
-discColl update r = Disc $ \xss -> let 
-    (kss, vs)           = unzip xss
-    elemKeyNumAssocs    = groupNum (toList <$> kss)
-    keyNumBlocks        = runDisc r elemKeyNumAssocs
-    keyNumElemNumAssocs = groupNum keyNumBlocks
-    sigs                = bdiscNat (length kss) update keyNumElemNumAssocs
-    yss                 = zip sigs vs
-  in filter (not . null) $ grouping1 (discNat (length keyNumBlocks)) `runDisc` yss
-
-discBag :: Disc k -> Disc [k]
-discBag = discColl updateBag
-
-discSet :: Disc k -> Disc [k]
-discSet = discColl updateSet
-
-updateBag :: [Int] -> Int -> [Int]
-updateBag vs v = v : vs
-
-updateSet :: [Int] -> Int -> [Int]
-updateSet [] w = [w]
-updateSet vs@(v:_) w 
-  | v == w    = vs
-  | otherwise = w : vs
 
 -- TODO: Finish discrimination for IORefs and STRefs
 

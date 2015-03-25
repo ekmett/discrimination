@@ -1,21 +1,28 @@
-{-# LANGUAGE GADTs, TypeOperators, RankNTypes, DeriveDataTypeable, DefaultSignatures, FlexibleContexts #-}
+{-# LANGUAGE GADTs, TypeOperators, RankNTypes, DeriveDataTypeable, DefaultSignatures, FlexibleContexts, TupleSections, ParallelListComp #-}
 {-# OPTIONS_GHC -fno-cse -fno-full-laziness #-}
 
 module Data.Discrimination.Class
   ( -- * Unordered Discrimination
-    Grouped(..)
-  , Grouping(..)
+    Grouping(..)
   , Grouping1(..)
+  , discColl
+  , discBag
+  , discSet
     -- * Ordered Discrimination
-  , Sorted(..)
   , Sorting(..)
   , Sorting1(..)
+  , sdiscColl
+  , sdiscBag
+  , sdiscSet
   ) where
 
 import Data.Bits
 import Data.Complex
 import Data.Ratio
 import Data.Discrimination.Generic
+import Data.Discrimination.Type
+import Data.Foldable hiding (concat)
+import Data.Functor
 import Data.Functor.Compose
 import Data.Functor.Contravariant
 import Data.Functor.Contravariant.Divisible
@@ -27,14 +34,10 @@ import Prelude hiding (read)
 
 -- * Unordered Discrimination (for partitioning)
 
-class Decidable f => Grouped f where
-  -- | Discriminate integers 65536 values at a time without revealing ordering
-  discShort :: f Int
-
 -- | 'Eq' equipped with a compatible stable unordered discriminator.
 class Grouping a where
-  grouping :: Grouped f => f a
-  default grouping :: (Grouped f, Deciding Grouping a) => f a
+  grouping :: Disc a
+  default grouping :: Deciding Grouping a => Disc a
   grouping = deciding (Proxy :: Proxy Grouping) grouping
 
 instance Grouping Void where
@@ -92,8 +95,8 @@ instance (Grouping1 f, Grouping1 g, Grouping a) => Grouping (Compose f g a) wher
   grouping = getCompose `contramap` grouping1 (grouping1 grouping)
 
 class Grouping1 f where
-  grouping1 :: Grouped g => g a -> g (f a)
-  default grouping1 :: (Grouped g, Deciding1 Grouping f) => g a -> g (f a)
+  grouping1 :: Disc a -> Disc (f a)
+  default grouping1 :: Deciding1 Grouping f => Disc a -> Disc (f a)
   grouping1 = deciding1 (Proxy :: Proxy Grouping) grouping
 
 instance Grouping1 []
@@ -109,17 +112,10 @@ instance Grouping1 Complex where
 
 -- * Ordered Discrimination
 
-class Decidable f => Sorted f where
-  -- | Discriminate integers in order
-  sdiscNat :: Int -> f Int
-
-  -- | Reverse the ordering
-  desc :: f a -> f a
-
 -- | 'Ord' equipped with a compatible stable, ordered discriminator.
 class Grouping a => Sorting a where
-  sorting :: Sorted f => f a
-  default sorting :: (Sorted f, Deciding Sorting a) => f a
+  sorting :: Disc a
+  default sorting :: Deciding Sorting a => Disc a
   sorting = deciding (Proxy :: Proxy Sorting) sorting
 
 instance Sorting Word8 where
@@ -175,8 +171,8 @@ instance (Sorting1 f, Sorting1 g, Sorting a) => Sorting (Compose f g a) where
   sorting = getCompose `contramap` sorting1 (sorting1 sorting)
 
 class Grouping1 f => Sorting1 f  where
-  sorting1 :: Sorted g => g a -> g (f a)
-  default sorting1 :: (Sorted g, Deciding1 Sorting f) => g a -> g (f a)
+  sorting1 :: Disc a -> Disc (f a)
+  default sorting1 :: Deciding1 Sorting f => Disc a -> Disc (f a)
   sorting1 = deciding1 (Proxy :: Proxy Sorting) sorting
 
 instance (Sorting1 f, Sorting1 g) => Sorting1 (Compose f g) where
@@ -185,3 +181,47 @@ instance (Sorting1 f, Sorting1 g) => Sorting1 (Compose f g) where
 instance Sorting1 []
 instance Sorting1 Maybe
 instance Sorting a => Sorting1 (Either a)
+
+sdiscColl :: Foldable f => ([Int] -> Int -> [Int]) -> Disc k -> Disc (f k)
+sdiscColl update r = Disc $ \xss -> let
+    (kss, vs)           = unzip xss
+    elemKeyNumAssocs    = groupNum (toList <$> kss)
+    keyNumBlocks        = runDisc r elemKeyNumAssocs
+    keyNumElemNumAssocs = groupNum keyNumBlocks
+    sigs                = bdiscNat (length kss) update keyNumElemNumAssocs
+    yss                 = zip sigs vs
+  in filter (not . null) $ sorting1 (sdiscNat (length keyNumBlocks)) `runDisc` yss
+
+groupNum :: [[k]] -> [(k,Int)]
+groupNum kss = concat [ (,n) <$> ks | n <- [0..] | ks <- kss ]
+
+sdiscBag :: Disc k -> Disc [k]
+sdiscBag = sdiscColl updateBag
+
+sdiscSet :: Disc k -> Disc [k]
+sdiscSet = sdiscColl updateSet
+
+discColl :: Foldable f => ([Int] -> Int -> [Int]) -> Disc k -> Disc (f k)
+discColl update r = Disc $ \xss -> let
+    (kss, vs)           = unzip xss
+    elemKeyNumAssocs    = groupNum (toList <$> kss)
+    keyNumBlocks        = runDisc r elemKeyNumAssocs
+    keyNumElemNumAssocs = groupNum keyNumBlocks
+    sigs                = bdiscNat (length kss) update keyNumElemNumAssocs
+    yss                 = zip sigs vs
+  in filter (not . null) $ grouping1 (discNat (length keyNumBlocks)) `runDisc` yss
+
+discBag :: Disc k -> Disc [k]
+discBag = discColl updateBag
+
+discSet :: Disc k -> Disc [k]
+discSet = discColl updateSet
+
+updateBag :: [Int] -> Int -> [Int]
+updateBag vs v = v : vs
+
+updateSet :: [Int] -> Int -> [Int]
+updateSet [] w = [w]
+updateSet vs@(v:_) w
+  | v == w    = vs
+  | otherwise = w : vs
