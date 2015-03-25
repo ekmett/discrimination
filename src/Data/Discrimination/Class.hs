@@ -22,14 +22,13 @@ import Control.Monad (join)
 import Data.Bits
 import Data.Complex
 import Data.Ratio
-import Data.Discrimination.Generic
 import Data.Discrimination.Type
 import Data.Foldable hiding (concat)
-import Data.Function (on)
 import Data.Functor
 import Data.Functor.Compose
 import Data.Functor.Contravariant
 import Data.Functor.Contravariant.Divisible
+import Data.Functor.Contravariant.Generic
 import Data.Int
 import Data.List as List
 import Data.Proxy
@@ -59,13 +58,25 @@ instance Grouping Word16 where
 instance Grouping Word32 where
   grouping = divide (\x -> (fromIntegral (unsafeShiftR x 16), fromIntegral x .&. 0xffff)) groupingShort groupingShort
 
+runs :: Eq a => [(a,b)] -> [[b]]
+runs [] = []
+runs ((a,b):xs0) = (b:ys0) : runs zs0
+  where
+    (ys0,zs0) = go xs0
+    go [] = ([],[])
+    go xs@((a', b'):xs')
+      | a == a' = case go xs' of
+         (ys, zs) -> (b':ys,zs)
+      | otherwise = ([], xs)
+
 instance Grouping Word64 where
-  grouping = Disc $ \ xs -> Prelude.map (map snd)
-                          $ (>>= List.groupBy (on (==) fst))
-                          $ runDisc groupingShort
-                          $ join $ runDisc groupingShort
-                          $ join $ runDisc groupingShort
-                          $ join $ runDisc groupingShort $ map radices xs
+  grouping = Disc $ \ xs -> do
+    as <- runDisc groupingShort
+       $ join $ runDisc groupingShort
+       $ join $ runDisc groupingShort
+       $ join $ runDisc groupingShort
+       $ map radices xs
+    runs as
     where
       radices (x,b) = (fromIntegral x .&. 0xffff
                     , (fromIntegral (unsafeShiftR x 16) .&. 0xffff
@@ -73,7 +84,6 @@ instance Grouping Word64 where
                     , (fromIntegral (unsafeShiftR x 48)
                     , (x,b)
                     ))))
-
 
 {-
   grouping = divide (\x -> ((fromIntegral (shiftR x 48) .&. 0xffff, fromIntegral (shiftR x 32) .&. 0xffff),
