@@ -18,7 +18,7 @@ module Data.Discrimination.Class
   , compared
   ) where
 
-import Control.Monad (join)
+import Control.Monad ((<=<), join)
 import Data.Bits
 import Data.Complex
 import Data.Ratio
@@ -35,6 +35,21 @@ import Data.Proxy
 import Data.Void
 import Data.Word
 import Prelude hiding (read)
+
+--------------------------------------------------------------------------------
+-- * Utilities
+--------------------------------------------------------------------------------
+
+runs :: Eq a => [(a,b)] -> [[b]]
+runs [] = []
+runs ((a,b):xs0) = (b:ys0) : runs zs0
+  where
+    (ys0,zs0) = go xs0
+    go [] = ([],[])
+    go xs@((a', b'):xs')
+      | a == a' = case go xs' of
+         (ys, zs) -> (b':ys,zs)
+      | otherwise = ([], xs)
 
 --------------------------------------------------------------------------------
 -- * Unordered Discrimination (for partitioning)
@@ -56,48 +71,22 @@ instance Grouping Word16 where
   grouping = contramap fromIntegral groupingShort
 
 instance Grouping Word32 where
-  grouping = divide (\x -> (fromIntegral (unsafeShiftR x 16), fromIntegral x .&. 0xffff)) groupingShort groupingShort
-
-runs :: Eq a => [(a,b)] -> [[b]]
-runs [] = []
-runs ((a,b):xs0) = (b:ys0) : runs zs0
-  where
-    (ys0,zs0) = go xs0
-    go [] = ([],[])
-    go xs@((a', b'):xs')
-      | a == a' = case go xs' of
-         (ys, zs) -> (b':ys,zs)
-      | otherwise = ([], xs)
+  grouping = Disc (runs <=< runDisc groupingShort . join . runDisc groupingShort . map radices) where
+    radices (x,b) = (fromIntegral x .&. 0xffff, (fromIntegral (unsafeShiftR x 16), (x,b)))
 
 instance Grouping Word64 where
-  grouping = Disc $ \ xs -> do
-    as <- runDisc groupingShort
-       $ join $ runDisc groupingShort
-       $ join $ runDisc groupingShort
-       $ join $ runDisc groupingShort
-       $ map radices xs
-    runs as
+  grouping = Disc (runs <=< runDisc groupingShort . join . runDisc groupingShort . join
+                          . runDisc groupingShort . join . runDisc groupingShort . map radices)
     where
-      radices (x,b) = (fromIntegral x .&. 0xffff
-                    , (fromIntegral (unsafeShiftR x 16) .&. 0xffff
-                    , (fromIntegral (unsafeShiftR x 32) .&. 0xffff
-                    , (fromIntegral (unsafeShiftR x 48)
-                    , (x,b)
-                    ))))
+      radices (x,b) = (fromIntegral x .&. 0xffff, (fromIntegral (unsafeShiftR x 16) .&. 0xffff
+                    , (fromIntegral (unsafeShiftR x 32) .&. 0xffff, (fromIntegral (unsafeShiftR x 48)
+                    , (x,b)))))
 
-{-
-  grouping = divide (\x -> ((fromIntegral (shiftR x 48) .&. 0xffff, fromIntegral (shiftR x 32) .&. 0xffff),
-                            (fromIntegral (unsafeShiftR x 16) .&. 0xffff, fromIntegral x .&. 0xffff)))
-                           (divide id groupingShort groupingShort) (divide id groupingShort groupingShort)
--}
 
 instance Grouping Word where
   grouping
-    | (maxBound :: Word) == 4294967295
-                = divide (\x -> (fromIntegral (unsafeShiftR x 16) .&. 0xffff, fromIntegral x .&. 0xffff)) groupingShort groupingShort
-    | otherwise = divide (\x -> ((fromIntegral (shiftR x 48) .&. 0xffff, fromIntegral (shiftR x 32) .&. 0xffff),
-                                 (fromIntegral (unsafeShiftR x 16) .&. 0xffff, fromIntegral x .&. 0xffff)))
-                                (divide id groupingShort groupingShort) (divide id groupingShort groupingShort)
+    | (maxBound :: Word) == 4294967295 = contramap (fromIntegral :: Word -> Word32) grouping
+    | otherwise                        = contramap (fromIntegral :: Word -> Word64) grouping
 
 instance Grouping Int8 where
   grouping = contramap (\x -> fromIntegral x + 128) groupingShort
@@ -106,7 +95,7 @@ instance Grouping Int16 where
   grouping = contramap (\x -> fromIntegral x + 32768) groupingShort
 
 instance Grouping Int32 where
-  grouping = divide (\x -> let y = fromIntegral (x - minBound) in (unsafeShiftR y 16, y .&. 0xffff)) groupingShort groupingShort
+  grouping = contramap (\x -> fromIntegral (x - minBound) :: Word32) grouping
 
 instance Grouping Int64 where
   grouping = contramap (\x -> fromIntegral (x - minBound) :: Word64) grouping
@@ -168,22 +157,25 @@ instance Sorting Word16 where
   sorting = contramap fromIntegral (sortingNat 65536)
 
 instance Sorting Word32 where
-  sorting = divide (\x -> ((fromIntegral (shiftR x 48) .&. 0xffff, fromIntegral (shiftR x 32) .&. 0xffff),
-                            (fromIntegral (unsafeShiftR x 16) .&. 0xffff, fromIntegral x .&. 0xffff))) go go where
-    go = divide id (sortingNat 65536) (sortingNat 65536)
+  -- sorting = divide (\x -> ((fromIntegral (shiftR x 48) .&. 0xffff, fromIntegral (shiftR x 32) .&. 0xffff), (fromIntegral (unsafeShiftR x 16) .&. 0xffff, fromIntegral x .&. 0xffff))) go go where go = divide id (sortingNat 65536) (sortingNat 65536)
+  sorting = Disc (runs <=< runDisc (sortingNat 65536) . join . runDisc (sortingNat 65536) . map radices) where
+    radices (x,b) = (fromIntegral x .&. 0xffff, (fromIntegral (unsafeShiftR x 16), (x,b)))
+
 
 instance Sorting Word64 where
-  sorting = divide (\x -> ((fromIntegral (shiftR x 48) .&. 0xffff, fromIntegral (shiftR x 32) .&. 0xffff),
-                            (fromIntegral (unsafeShiftR x 16) .&. 0xffff, fromIntegral x .&. 0xffff))) go go where
-    go = divide id (sortingNat 65536) (sortingNat 65536)
+  -- sorting = divide (\x -> ((fromIntegral (shiftR x 48) .&. 0xffff, fromIntegral (shiftR x 32) .&. 0xffff), (fromIntegral (unsafeShiftR x 16) .&. 0xffff, fromIntegral x .&. 0xffff))) go go where go = divide id (sortingNat 65536) (sortingNat 65536)
+  sorting = Disc (runs <=< runDisc (sortingNat 65536) . join . runDisc (sortingNat 65536) . join
+                         . runDisc (sortingNat 65536) . join . runDisc (sortingNat 65536) . map radices)
+    where
+      radices (x,b) = (fromIntegral x .&. 0xffff, (fromIntegral (unsafeShiftR x 16) .&. 0xffff
+                    , (fromIntegral (unsafeShiftR x 32) .&. 0xffff, (fromIntegral (unsafeShiftR x 48)
+                    , (x,b)))))
+
 
 instance Sorting Word where
   sorting
-    | (maxBound :: Word) == 4294967295
-                = divide (\x -> (fromIntegral (unsafeShiftR x 16) .&. 0xffff, fromIntegral x .&. 0xffff)) (sortingNat 65536) (sortingNat 65536)
-    | otherwise = divide (\x -> ((fromIntegral (shiftR x 48) .&. 0xffff, fromIntegral (shiftR x 32) .&. 0xffff),
-                                 (fromIntegral (unsafeShiftR x 16) .&. 0xffff, fromIntegral x .&. 0xffff))) go go where
-    go = divide id (sortingNat 65536) (sortingNat 65536)
+    | (maxBound :: Word) == 4294967295 = contramap (fromIntegral :: Word -> Word32) sorting
+    | otherwise                        = contramap (fromIntegral :: Word -> Word64) sorting
 
 instance Sorting Int8 where
   sorting = contramap (\x -> fromIntegral (x - minBound)) (sortingNat 256)
@@ -279,3 +271,4 @@ updateSet [] w = [w]
 updateSet vs@(v:_) w
   | v == w    = vs
   | otherwise = w : vs
+
