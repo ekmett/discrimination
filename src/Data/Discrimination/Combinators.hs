@@ -31,9 +31,11 @@ import Data.Set as Set
 -- $common
 -- Useful combinators for generalized list comprehensions.
 
--- | Similar to 'Data.List.group', except we do not require groups to be clustered.
+-- | /O(n)/. Similar to 'Data.List.group', except we do not require groups to be clustered.
 --
 -- This combinator still operates in linear time, at the expense of productivity.
+--
+-- The result equivalence classes are _not_ sorted, but the grouping is stable.
 --
 -- @
 -- 'group' = 'groupWith' 'id'
@@ -41,11 +43,14 @@ import Data.Set as Set
 group :: Grouping a => [a] -> [[a]]
 group as = runDisc grouping [(a, a) | a <- as]
 
--- | Replaces 'GHC.Exts.groupWith' using discrimination. The result is not sorted.
+-- | /O(n)/. This is a replacement for 'GHC.Exts.groupWith' using discrimination.
+--
+-- The result equivalence classes are _not_ sorted, but the grouping is stable.
 groupWith :: Grouping b => (a -> b) -> [a] -> [[a]]
 groupWith f as = runDisc grouping [(f a, a) | a <- as]
 
--- | This linear time replacement for 'Data.List.nub' from @Data.List@ uses discrimination.
+-- | /O(n)/. This upgrades 'Data.List.nub' from @Data.List@ from /O(n^2)/ to /O(n)/ by using
+-- unordered discrimination.
 --
 -- @
 -- 'nub' = 'nubWith' 'id'
@@ -54,14 +59,15 @@ groupWith f as = runDisc grouping [(f a, a) | a <- as]
 nub :: Grouping a => [a] -> [a]
 nub as = head <$> group as
 
--- |
+-- | /O(n)/. 'nub' with a Schwartzian transform.
+--
 -- @
 -- 'nubWith' f as = 'head' 'Control.Applicative.<$>' 'groupWith' f as
 -- @
 nubWith :: Grouping b => (a -> b) -> [a] -> [a]
 nubWith f as = head <$> groupWith f as
 
--- | This linear time replacement for 'Data.List.sort' uses discrimination.
+-- | / O(n)/. Sort a list using discrimination.
 --
 -- @
 -- 'sort' = 'sortWith' 'id'
@@ -69,7 +75,9 @@ nubWith f as = head <$> groupWith f as
 sort :: Sorting a => [a] -> [a]
 sort as = concat $ runDisc sorting [ (a,a) | a <- as ]
 
--- | This linear time replacement for 'GHC.Exts.sortWith' and 'Data.List.sortOn' uses discrimination.
+-- | /O(n)/. Sort a list with a Schwartzian transformation by using discrimination. 
+--
+-- This linear time replacement for 'GHC.Exts.sortWith' and 'Data.List.sortOn' uses discrimination.
 sortWith :: Sorting b => (a -> b) -> [a] -> [a]
 sortWith f as = concat $ runDisc sorting [ (f a, a) | a <- as ]
 
@@ -77,7 +85,7 @@ sortWith f as = concat $ runDisc sorting [ (f a, a) | a <- as ]
 -- * Container Construction
 --------------------------------------------------------------------------------
 
--- | Construct a 'Map' in linear time.
+-- | /O(n)/. Construct a 'Map'.
 --
 -- This is an asymptotically faster version of 'Data.Map.fromList', which exploits ordered discrimination.
 --
@@ -92,7 +100,7 @@ sortWith f as = concat $ runDisc sorting [ (f a, a) | a <- as ]
 toMap :: Sorting k => [(k, v)] -> Map k v
 toMap kvs = Map.fromDistinctAscList $ last <$> runDisc sorting [ (fst kv, kv) | kv <- kvs ]
 
--- | Construct a 'Map' in linear time, combining values.
+-- | /O(n)/. Construct a 'Map', combining values.
 --
 -- This is an asymptotically faster version of 'Data.Map.fromListWith', which exploits ordered discrimination.
 --
@@ -108,7 +116,7 @@ toMapWith f kvs0 = Map.fromDistinctAscList $ go <$> runDisc sorting [ (fst kv, k
   go ((k,v):kvs) = (k, Prelude.foldl (flip (f . snd)) v kvs)
   go []          = error "bad sort"
 
--- | Construct a 'Map' in linear time, combining values with access to the key.
+-- | /O(n)/. Construct a 'Map', combining values with access to the key.
 --
 -- This is an asymptotically faster version of 'Data.Map.fromListWithKey', which exploits ordered discrimination.
 --
@@ -125,7 +133,7 @@ toMapWithKey f kvs0 = Map.fromDistinctAscList $ go <$> runDisc sorting [ (fst kv
   go ((k,v):kvs) = (k, Prelude.foldl (flip (f k . snd)) v kvs)
   go []          = error "bad sort"
 
--- | Construct an 'IntMap' in linear time.
+-- | /O(n)/. Construct an 'IntMap'.
 --
 -- >>> toIntMap [] == empty
 -- True
@@ -138,7 +146,7 @@ toMapWithKey f kvs0 = Map.fromDistinctAscList $ go <$> runDisc sorting [ (fst kv
 toIntMap :: [(Int, v)] -> IntMap v
 toIntMap kvs = IntMap.fromDistinctAscList $ last <$> runDisc sorting [ (fst kv, kv) | kv <- kvs ]
 
--- | Construct an 'IntMap' in linear time, combining values.
+-- | /O(n)/. Construct an 'IntMap', combining values.
 --
 -- This is an asymptotically faster version of 'Data.IntMap.Lazy.fromListWith', which exploits ordered discrimination.
 --
@@ -154,7 +162,7 @@ toIntMapWith f kvs0 = IntMap.fromDistinctAscList $ go <$> runDisc sorting [ (fst
   go ((k,v):kvs) = (k, Prelude.foldl (flip (f . snd)) v kvs)
   go []          = error "bad sort"
 
--- | Construct a 'Map' in linear time, combining values with access to the key.
+-- | /O(n)/. Construct a 'Map', combining values with access to the key.
 --
 -- This is an asymptotically faster version of 'Data.IntMap.Lazy.fromListWithKey', which exploits ordered discrimination.
 --
@@ -171,13 +179,13 @@ toIntMapWithKey f kvs0 = IntMap.fromDistinctAscList $ go <$> runDisc sorting [ (
   go ((k,v):kvs) = (k, Prelude.foldl (flip (f k . snd)) v kvs)
   go []          = error "bad sort"
 
--- | Construct a 'Set' in linear time.
+-- | /O(n)/. Construct a 'Set' in linear time.
 --
 -- This is an asymptotically faster version of 'Data.Set.fromList', which exploits ordered discrimination.
 toSet :: Sorting k => [k] -> Set k
 toSet kvs = Set.fromDistinctAscList $ last <$> runDisc sorting [ (kv, kv) | kv <- kvs ]
 
--- | Construct an 'IntSet' in linear time.
+-- | /O(n)/. Construct an 'IntSet' in linear time.
 --
 -- This is an asymptotically faster version of 'Data.IntSet.fromList', which exploits ordered discrimination.
 toIntSet :: [Int] -> IntSet
@@ -187,39 +195,50 @@ toIntSet kvs = IntSet.fromDistinctAscList $ last <$> runDisc sorting [ (kv, kv) 
 -- * Joins
 --------------------------------------------------------------------------------
 
+-- | Perform a full outer join while explicit merging of the two result tables a table at a time.
 joining
-  :: Disc d
-  -> ([a] -> [b] -> c)
-  -> (a -> d)
-  -> (b -> d)
-  -> [a]
-  -> [b]
-  -> [c]
+  :: Disc d            -- ^ the discriminator to use
+  -> ([a] -> [b] -> c) -- ^ how to join two tables
+  -> (a -> d)          -- ^ selector for the left table
+  -> (b -> d)          -- ^ selector for the right table
+  -> [a]               -- ^ left table
+  -> [b]               -- ^ right table
+  -> [c]               
 joining disc abc ad bd as bs = spanEither abc <$> runDisc disc (((ad &&& Left) <$> as) ++ ((bd &&& Right) <$> bs))
 {-# INLINE joining #-}
 
+-- | /O(n)/. Perform an inner join, with operations defined one row at a time.
+--
+-- The results are grouped by the discriminator.
+--
+-- This takes operation time linear in both the input and result sets.
 inner
-  :: Disc d
-  -> (a -> b -> c)
-  -> (a -> d)
-  -> (b -> d)
-  -> [a]
-  -> [b]
+  :: Disc d        -- ^ the discriminator to use
+  -> (a -> b -> c) -- ^ how to join two rows
+  -> (a -> d)      -- ^ selector for the left table
+  -> (b -> d)      -- ^ selector for the right table
+  -> [a]           -- ^ left table
+  -> [b]           -- ^ right table
   -> [[c]]
 inner disc abc ad bd as bs = catMaybes $ joining disc go ad bd as bs where
   go ap bp
     | Prelude.null ap || Prelude.null bp = Nothing
     | otherwise = Just (liftA2 abc ap bp)
 
+-- | /O(n)/. Perform a full outer join with operations defined one row at a time.
+--
+-- The results are grouped by the discriminator.
+--
+-- This takes operation time linear in both the input and result sets.
 outer
-  :: Disc d
-  -> (a -> b -> c)
-  -> (a -> c)
-  -> (b -> c)
-  -> (a -> d)
-  -> (b -> d)
-  -> [a]
-  -> [b]
+  :: Disc d        -- ^ the discriminator to use
+  -> (a -> b -> c) -- ^ how to join two rows
+  -> (a -> c)      -- ^ row present on the left, missing on the right
+  -> (b -> c)      -- ^ row present on the right, missing on the left
+  -> (a -> d)      -- ^ selector for the left table
+  -> (b -> d)      -- ^ selector for the right table
+  -> [a]           -- ^ left table
+  -> [b]           -- ^ right table
   -> [[c]]
 outer disc abc ac bc ad bd as bs = joining disc go ad bd as bs where
   go ap bp
@@ -227,14 +246,19 @@ outer disc abc ac bc ad bd as bs = joining disc go ad bd as bs where
     | Prelude.null bp = ac <$> ap
     | otherwise = liftA2 abc ap bp
 
+-- | /O(n)/. Perform a left outer join with operations defined one row at a time.
+--
+-- The results are grouped by the discriminator.
+--
+-- This takes operation time linear in both the input and result sets.
 leftOuter
-  :: Disc d
-  -> (a -> b -> c)
-  -> (a -> c)
-  -> (a -> d)
-  -> (b -> d)
-  -> [a]
-  -> [b]
+  :: Disc d        -- ^ the discriminator to use
+  -> (a -> b -> c) -- ^ how to join two rows
+  -> (a -> c)      -- ^ row present on the left, missing on the right
+  -> (a -> d)      -- ^ selector for the left table
+  -> (b -> d)      -- ^ selector for the right table
+  -> [a]           -- ^ left table
+  -> [b]           -- ^ right table
   -> [[c]]
 leftOuter disc abc ac ad bd as bs = catMaybes $ joining disc go ad bd as bs where
   go ap bp
@@ -242,14 +266,19 @@ leftOuter disc abc ac ad bd as bs = catMaybes $ joining disc go ad bd as bs wher
     | Prelude.null bp = Just (ac <$> ap)
     | otherwise = Just (liftA2 abc ap bp)
 
+-- | /O(n)/. Perform a right outer join with operations defined one row at a time.
+--
+-- The results are grouped by the discriminator.
+--
+-- This takes operation time linear in both the input and result sets.
 rightOuter
-  :: Disc d
-  -> (a -> b -> c)
-  -> (b -> c)
-  -> (a -> d)
-  -> (b -> d)
-  -> [a]
-  -> [b]
+  :: Disc d        -- ^ the discriminator to use
+  -> (a -> b -> c) -- ^ how to join two rows
+  -> (b -> c)      -- ^ row present on the right, missing on the left
+  -> (a -> d)      -- ^ selector for the left table
+  -> (b -> d)      -- ^ selector for the right table
+  -> [a]           -- ^ left table
+  -> [b]           -- ^ right table
   -> [[c]]
 rightOuter disc abc bc ad bd as bs = catMaybes $ joining disc go ad bd as bs where
   go ap bp
