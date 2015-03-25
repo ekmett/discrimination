@@ -18,11 +18,12 @@
 {-# OPTIONS_GHC -rtsopts -threaded -fno-cse -fno-full-laziness #-}
 module Data.Discrimination.Type
   ( Disc(..)
-  , groupingNat
-  , groupingShort
   , sortingNat
-  , bdiscNat
+  , groupingShort
   , desc
+  -- * Internals
+  , groupingNat
+  , bdiscNat
   ) where
 
 import Control.Arrow
@@ -86,9 +87,9 @@ instance Monoid (Disc a) where
 -- Primitives
 --------------------------------------------------------------------------------
 
--- | unordered discrimination by bucket, not inherently thread-safe
--- but it only has to restore the elements that were used
--- unlike the more obvious ST implementation, so it wins by
+-- | Perform stable unordered discrimination by bucket.
+--
+-- This reuses arrays unlike the more obvious ST implementation, so it wins by
 -- a huge margin in a race, especially when we have a large
 -- keyspace, sparsely used, with low contention.
 -- This will leak a number of arrays equal to the maximum concurrent
@@ -96,6 +97,9 @@ instance Monoid (Disc a) where
 -- make multiple stacks of working pads and index the stack with the
 -- hash of the current thread id to reduce contention at the expense
 -- of taking more memory.
+--
+-- You should create a thunk that holds the discriminator from @groupingNat n@
+-- for a known @n@ and then reuse it.
 groupingNat :: Int -> Disc Int
 groupingNat n = unsafePerformIO $ do
     ts <- newIORef ([] :: [UM.MVector RealWorld [Any]])
