@@ -13,12 +13,15 @@ copyright:     Copyright (C) 2014-2015 Edward A. Kmett
 build-type:    Simple
 tested-with:   GHC == 7.8.4
 synopsis:      Fast generic linear-time discrimination and sorting
-description:   Fast generic linear-time discrimination and sorting
+description:
+  This package provides fast, generic, linear-time discrimination and sorting.
+  .
+  The techniques applied are based on <http://www.diku.dk/hjemmesider/ansatte/henglein/papers/henglein2011a.pdf multiple> <http://www.diku.dk/hjemmesider/ansatte/henglein/papers/henglein2011c.pdf papers> and <https://www.youtube.com/watch?v=sz9ZlZIRDAg talks> by <http://www.diku.dk/hjemmesider/ansatte/henglein/ Fritz Henglein>.
 
 extra-source-files:
   .gitignore
-  CHANGELOG.markdown
   README.markdown
+  CHANGELOG.markdown
 
 source-repository head
   type: git
