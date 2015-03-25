@@ -195,7 +195,9 @@ toIntSet kvs = IntSet.fromDistinctAscList $ last <$> runDisc sorting [ (kv, kv) 
 -- * Joins
 --------------------------------------------------------------------------------
 
--- | Perform a full outer join while explicit merging of the two result tables a table at a time.
+-- | /O(n)/. Perform a full outer join while explicit merging of the two result tables a table at a time.
+--
+-- The results are grouped by the discriminator.
 joining
   :: Disc d            -- ^ the discriminator to use
   -> ([a] -> [b] -> c) -- ^ how to join two tables
