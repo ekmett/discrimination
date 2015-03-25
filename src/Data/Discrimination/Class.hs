@@ -61,8 +61,8 @@ instance Grouping Word32 where
 
 instance Grouping Word64 where
   grouping = Disc $ \ xs -> Prelude.map (map snd)
-                          $ List.groupBy (on (==) fst)
-                          $ join $ runDisc groupingShort
+                          $ (>>= List.groupBy (on (==) fst))
+                          $ runDisc groupingShort
                           $ join $ runDisc groupingShort
                           $ join $ runDisc groupingShort
                           $ join $ runDisc groupingShort $ map radices xs
