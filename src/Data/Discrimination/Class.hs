@@ -5,15 +5,15 @@ module Data.Discrimination.Class
   ( -- * Unordered Discrimination
     Grouping(..)
   , Grouping1(..)
-  , discColl
-  , discBag
-  , discSet
+  , groupingColl
+  , groupingBag
+  , groupingSet
     -- * Ordered Discrimination
   , Sorting(..)
   , Sorting1(..)
-  , sdiscColl
-  , sdiscBag
-  , sdiscSet
+  , sortingColl
+  , sortingBag
+  , sortingSet
   ) where
 
 import Data.Bits
@@ -44,35 +44,35 @@ instance Grouping Void where
   grouping = lose id
 
 instance Grouping Word8 where
-  grouping = contramap fromIntegral discShort
+  grouping = contramap fromIntegral groupingShort
 
 instance Grouping Word16 where
-  grouping = contramap fromIntegral discShort
+  grouping = contramap fromIntegral groupingShort
 
 instance Grouping Word32 where
-  grouping = divide (\x -> (fromIntegral (unsafeShiftR x 16), fromIntegral x .&. 0xffff)) discShort discShort
+  grouping = divide (\x -> (fromIntegral (unsafeShiftR x 16), fromIntegral x .&. 0xffff)) groupingShort groupingShort
 
 instance Grouping Word64 where
   grouping = divide (\x -> ((fromIntegral (shiftR x 48) .&. 0xffff, fromIntegral (shiftR x 32) .&. 0xffff),
                             (fromIntegral (unsafeShiftR x 16) .&. 0xffff, fromIntegral x .&. 0xffff)))
-                           (divide id discShort discShort) (divide id discShort discShort)
+                           (divide id groupingShort groupingShort) (divide id groupingShort groupingShort)
 
 instance Grouping Word where
   grouping
     | (maxBound :: Word) == 4294967295
-                = divide (\x -> (fromIntegral (unsafeShiftR x 16) .&. 0xffff, fromIntegral x .&. 0xffff)) discShort discShort
+                = divide (\x -> (fromIntegral (unsafeShiftR x 16) .&. 0xffff, fromIntegral x .&. 0xffff)) groupingShort groupingShort
     | otherwise = divide (\x -> ((fromIntegral (shiftR x 48) .&. 0xffff, fromIntegral (shiftR x 32) .&. 0xffff),
                                  (fromIntegral (unsafeShiftR x 16) .&. 0xffff, fromIntegral x .&. 0xffff)))
-                                (divide id discShort discShort) (divide id discShort discShort)
+                                (divide id groupingShort groupingShort) (divide id groupingShort groupingShort)
 
 instance Grouping Int8 where
-  grouping = contramap (\x -> fromIntegral x + 128) discShort
+  grouping = contramap (\x -> fromIntegral x + 128) groupingShort
 
 instance Grouping Int16 where
-  grouping = contramap (\x -> fromIntegral x + 32768) discShort
+  grouping = contramap (\x -> fromIntegral x + 32768) groupingShort
 
 instance Grouping Int32 where
-  grouping = divide (\x -> let y = fromIntegral (x - minBound) in (unsafeShiftR y 16, y .&. 0xffff)) discShort discShort
+  grouping = divide (\x -> let y = fromIntegral (x - minBound) in (unsafeShiftR y 16, y .&. 0xffff)) groupingShort groupingShort
 
 instance Grouping Int64 where
   grouping = contramap (\x -> fromIntegral (x - minBound) :: Word64) grouping
@@ -119,34 +119,34 @@ class Grouping a => Sorting a where
   sorting = deciding (Proxy :: Proxy Sorting) sorting
 
 instance Sorting Word8 where
-  sorting = contramap fromIntegral (sdiscNat 256)
+  sorting = contramap fromIntegral (sortingNat 256)
 
 instance Sorting Word16 where
-  sorting = contramap fromIntegral (sdiscNat 65536)
+  sorting = contramap fromIntegral (sortingNat 65536)
 
 instance Sorting Word32 where
   sorting = divide (\x -> ((fromIntegral (shiftR x 48) .&. 0xffff, fromIntegral (shiftR x 32) .&. 0xffff),
                             (fromIntegral (unsafeShiftR x 16) .&. 0xffff, fromIntegral x .&. 0xffff))) go go where
-    go = divide id (sdiscNat 65536) (sdiscNat 65536)
+    go = divide id (sortingNat 65536) (sortingNat 65536)
 
 instance Sorting Word64 where
   sorting = divide (\x -> ((fromIntegral (shiftR x 48) .&. 0xffff, fromIntegral (shiftR x 32) .&. 0xffff),
                             (fromIntegral (unsafeShiftR x 16) .&. 0xffff, fromIntegral x .&. 0xffff))) go go where
-    go = divide id (sdiscNat 65536) (sdiscNat 65536)
+    go = divide id (sortingNat 65536) (sortingNat 65536)
 
 instance Sorting Word where
   sorting
     | (maxBound :: Word) == 4294967295
-                = divide (\x -> (fromIntegral (unsafeShiftR x 16) .&. 0xffff, fromIntegral x .&. 0xffff)) (sdiscNat 65536) (sdiscNat 65536)
+                = divide (\x -> (fromIntegral (unsafeShiftR x 16) .&. 0xffff, fromIntegral x .&. 0xffff)) (sortingNat 65536) (sortingNat 65536)
     | otherwise = divide (\x -> ((fromIntegral (shiftR x 48) .&. 0xffff, fromIntegral (shiftR x 32) .&. 0xffff),
                                  (fromIntegral (unsafeShiftR x 16) .&. 0xffff, fromIntegral x .&. 0xffff))) go go where
-    go = divide id (sdiscNat 65536) (sdiscNat 65536)
+    go = divide id (sortingNat 65536) (sortingNat 65536)
 
 instance Sorting Int8 where
-  sorting = contramap (\x -> fromIntegral (x - minBound)) (sdiscNat 256)
+  sorting = contramap (\x -> fromIntegral (x - minBound)) (sortingNat 256)
 
 instance Sorting Int16 where
-  sorting = contramap (\x -> fromIntegral (x - minBound)) (sdiscNat 65536)
+  sorting = contramap (\x -> fromIntegral (x - minBound)) (sortingNat 65536)
 
 instance Sorting Int32 where
   sorting = contramap (\x -> fromIntegral (x - minBound) :: Word32) sorting
@@ -182,40 +182,40 @@ instance Sorting1 []
 instance Sorting1 Maybe
 instance Sorting a => Sorting1 (Either a)
 
-sdiscColl :: Foldable f => ([Int] -> Int -> [Int]) -> Disc k -> Disc (f k)
-sdiscColl update r = Disc $ \xss -> let
+sortingColl :: Foldable f => ([Int] -> Int -> [Int]) -> Disc k -> Disc (f k)
+sortingColl update r = Disc $ \xss -> let
     (kss, vs)           = unzip xss
     elemKeyNumAssocs    = groupNum (toList <$> kss)
     keyNumBlocks        = runDisc r elemKeyNumAssocs
     keyNumElemNumAssocs = groupNum keyNumBlocks
     sigs                = bdiscNat (length kss) update keyNumElemNumAssocs
     yss                 = zip sigs vs
-  in filter (not . null) $ sorting1 (sdiscNat (length keyNumBlocks)) `runDisc` yss
+  in filter (not . null) $ sorting1 (sortingNat (length keyNumBlocks)) `runDisc` yss
 
 groupNum :: [[k]] -> [(k,Int)]
 groupNum kss = concat [ (,n) <$> ks | n <- [0..] | ks <- kss ]
 
-sdiscBag :: Disc k -> Disc [k]
-sdiscBag = sdiscColl updateBag
+sortingBag :: Disc k -> Disc [k]
+sortingBag = sortingColl updateBag
 
-sdiscSet :: Disc k -> Disc [k]
-sdiscSet = sdiscColl updateSet
+sortingSet :: Disc k -> Disc [k]
+sortingSet = sortingColl updateSet
 
-discColl :: Foldable f => ([Int] -> Int -> [Int]) -> Disc k -> Disc (f k)
-discColl update r = Disc $ \xss -> let
+groupingColl :: Foldable f => ([Int] -> Int -> [Int]) -> Disc k -> Disc (f k)
+groupingColl update r = Disc $ \xss -> let
     (kss, vs)           = unzip xss
     elemKeyNumAssocs    = groupNum (toList <$> kss)
     keyNumBlocks        = runDisc r elemKeyNumAssocs
     keyNumElemNumAssocs = groupNum keyNumBlocks
     sigs                = bdiscNat (length kss) update keyNumElemNumAssocs
     yss                 = zip sigs vs
-  in filter (not . null) $ grouping1 (discNat (length keyNumBlocks)) `runDisc` yss
+  in filter (not . null) $ grouping1 (groupingNat (length keyNumBlocks)) `runDisc` yss
 
-discBag :: Disc k -> Disc [k]
-discBag = discColl updateBag
+groupingBag :: Disc k -> Disc [k]
+groupingBag = groupingColl updateBag
 
-discSet :: Disc k -> Disc [k]
-discSet = discColl updateSet
+groupingSet :: Disc k -> Disc [k]
+groupingSet = groupingColl updateSet
 
 updateBag :: [Int] -> Int -> [Int]
 updateBag vs v = v : vs

@@ -18,9 +18,9 @@
 {-# OPTIONS_GHC -rtsopts -threaded -fno-cse -fno-full-laziness #-}
 module Data.Discrimination.Type
   ( Disc(..)
-  , discNat
-  , discShort
-  , sdiscNat
+  , groupingNat
+  , groupingShort
+  , sortingNat
   , bdiscNat
   , desc
   ) where
@@ -67,10 +67,10 @@ instance Contravariant Disc where
 instance Divisible Disc where
   conquer = Disc $ return . fmap snd
   divide k (Disc l) (Disc r) = Disc $ \xs ->
-    l [ (b, (c, d)) | (a,d) <- xs, let (b, c) = k a] >>= r 
+    l [ (b, (c, d)) | (a,d) <- xs, let (b, c) = k a] >>= r
 
 instance Decidable Disc where
-  lose k = Disc $ fmap (absurd.k.fst) 
+  lose k = Disc $ fmap (absurd.k.fst)
   choose f (Disc l) (Disc r) = Disc $ \xs -> let ys = fmap (first f) xs
     in l [ (k,v) | (Left k, v) <- ys]
     ++ r [ (k,v) | (Right k, v) <- ys]
@@ -94,8 +94,8 @@ instance Monoid (Disc a) where
 -- make multiple stacks of working pads and index the stack with the
 -- hash of the current thread id to reduce contention at the expense
 -- of taking more memory.
-discNat :: Int -> Disc Int
-discNat n = unsafePerformIO $ do
+groupingNat :: Int -> Disc Int
+groupingNat n = unsafePerformIO $ do
     ts <- newIORef ([] :: [UM.MVector RealWorld [Any]])
     return $ Disc $ go ts
   where
@@ -115,17 +115,17 @@ discNat n = unsafePerformIO $ do
       atomicModifyIORef ts $ \ws -> (unsafeCoerce t:ws, ())
       return zs
     {-# NOINLINE go #-}
-{-# NOINLINE discNat #-}
+{-# NOINLINE groupingNat #-}
 
 -- | Shared bucket set for small integers
-discShort :: Disc Int
-discShort = discNat 65536
-{-# NOINLINE discShort #-}
+groupingShort :: Disc Int
+groupingShort = groupingNat 65536
+{-# NOINLINE groupingShort #-}
 
-sdiscNat :: Int -> Disc Int
-sdiscNat n = Disc $ \xs -> filter (not . null) (bdiscNat n update xs) where
+sortingNat :: Int -> Disc Int
+sortingNat n = Disc $ \xs -> filter (not . null) (bdiscNat n update xs) where
   update vs v = v : vs
-{-# INLINE sdiscNat #-}
+{-# INLINE sortingNat #-}
 
 desc :: Disc a -> Disc a
 desc (Disc l) = Disc (reverse . l)
@@ -139,8 +139,8 @@ bdiscNat n update xs = reverse <$> Array.elems (Array.accumArray update [] (0,n)
 {-
 foreign import prim "walk" walk :: Any -> MutableByteArray# s -> State# s -> (# State# s, Int# #)
 
-discSTRef :: Disc Addr -> Disc (STRef s a)
-discSTRef (Disc f) = Disc $ \xs -> 
+groupingSTRef :: Disc Addr -> Disc (STRef s a)
+groupingSTRef (Disc f) = Disc $ \xs ->
   let force !n !(!(STRef !_,_):ys) = force (n + 1) ys
       force !n [] = n
   in case force 0 xs of
@@ -149,8 +149,8 @@ discSTRef (Disc f) = Disc $ \xs ->
      IO $ \s -> case walk (unsafeCoerce xs) mba s of (# s', _ #) -> (# s', () #)
      ys <- P.freeze mv
      return $ f [ (a,snd kv) | kv <- xs | a <- P.toList ys ]
-{-# NOINLINE discSTRef #-}
+{-# NOINLINE groupingSTRef #-}
 
-discIORef :: forall a. Disc Addr -> Disc (IORef a)
-discIORef = coerce (discSTRef :: Disc Addr -> Disc (STRef RealWorld a))
+groupingIORef :: forall a. Disc Addr -> Disc (IORef a)
+groupingIORef = coerce (groupingSTRef :: Disc Addr -> Disc (STRef RealWorld a))
 -}

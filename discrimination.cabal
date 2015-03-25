@@ -9,9 +9,9 @@ maintainer:    Edward A. Kmett <ekmett@gmail.com>
 stability:     experimental
 homepage:      http://github.com/ekmett/discrimination/
 bug-reports:   http://github.com/ekmett/discrimination/issues
-copyright:     Copyright (C) 2014 Edward A. Kmett
+copyright:     Copyright (C) 2014-2015 Edward A. Kmett
 build-type:    Simple
-tested-with:   GHC == 7.8.3
+tested-with:   GHC == 7.8.4
 synopsis:      Fast generic linear-time discrimination and sorting
 description:   Fast generic linear-time discrimination and sorting
 
@@ -33,10 +33,8 @@ library
     Data.Discrimination
     Data.Discrimination.Class
     Data.Discrimination.Combinators
-    Data.Discrimination.Join
-    Data.Discrimination.Table
-    Data.Discrimination.Type
     Data.Discrimination.Generic
+    Data.Discrimination.Type
 
   build-depends:
     adjunctions,
