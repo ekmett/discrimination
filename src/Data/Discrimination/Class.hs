@@ -241,10 +241,18 @@ sortingColl update r = Disc $ \xss -> let
 groupNum :: [[k]] -> [(k,Int)]
 groupNum kss = concat [ (,n) <$> ks | n <- [0..] | ks <- kss ]
 
-sortingBag :: Disc k -> Disc [k]
+-- | Construct a stable ordered discriminator that sorts a list as multisets of elements from another stable ordered discriminator.
+--
+-- The resulting discriminator only cares about the set of keys and their multiplicity, and is sorted as if we'd
+-- sorted each key in turn before comparing.
+sortingBag :: Foldable f => Disc k -> Disc (f k)
 sortingBag = sortingColl updateBag
 
-sortingSet :: Disc k -> Disc [k]
+-- | Construct a stable ordered discriminator that sorts a list as sets of elements from another stable ordered discriminator.
+--
+-- The resulting discriminator only cares about the set of keys, and is sorted as if we'd
+-- sorted each key in turn before comparing.
+sortingSet :: Foldable f => Disc k -> Disc (f k)
 sortingSet = sortingColl updateSet
 
 groupingColl :: Foldable f => ([Int] -> Int -> [Int]) -> Disc k -> Disc (f k)
@@ -257,10 +265,12 @@ groupingColl update r = Disc $ \xss -> let
     yss                 = zip sigs vs
   in filter (not . null) $ grouping1 (groupingNat (length keyNumBlocks)) `runDisc` yss
 
-groupingBag :: Disc k -> Disc [k]
+-- | Construct an stable unordered discriminator that partitions into equivalence classes based on the equivalence of keys as a multiset.
+groupingBag :: Foldable f => Disc k -> Disc (f k)
 groupingBag = groupingColl updateBag
 
-groupingSet :: Disc k -> Disc [k]
+-- | Construct an stable unordered discriminator that partitions into equivalence classes based on the equivalence of keys as a set.
+groupingSet :: Foldable f => Disc k -> Disc (f k)
 groupingSet = groupingColl updateSet
 
 updateBag :: [Int] -> Int -> [Int]
