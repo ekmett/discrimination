@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, TypeOperators, RankNTypes, DeriveDataTypeable, DefaultSignatures, FlexibleContexts, TupleSections, ParallelListComp #-}
+{-# LANGUAGE CPP, GADTs, TypeOperators, RankNTypes, DeriveDataTypeable, DefaultSignatures, FlexibleContexts, TupleSections, ParallelListComp #-}
 {-# OPTIONS_GHC -fno-cse -fno-full-laziness #-}
 
 module Data.Discrimination.Class
@@ -41,8 +41,10 @@ import Prelude hiding (read)
 -- | 'Eq' equipped with a compatible stable unordered discriminator.
 class Grouping a where
   grouping :: Disc a
+#ifndef HLINT
   default grouping :: Deciding Grouping a => Disc a
   grouping = deciding (Proxy :: Proxy Grouping) grouping
+#endif
 
 instance Grouping Void where
   grouping = lose id
@@ -102,8 +104,10 @@ instance (Grouping1 f, Grouping1 g, Grouping a) => Grouping (Compose f g a) wher
 
 class Grouping1 f where
   grouping1 :: Disc a -> Disc (f a)
+#ifndef HLINT
   default grouping1 :: Deciding1 Grouping f => Disc a -> Disc (f a)
   grouping1 = deciding1 (Proxy :: Proxy Grouping) grouping
+#endif
 
 instance Grouping1 []
 instance Grouping1 Maybe
@@ -130,8 +134,10 @@ groupingEq a b = case runDisc grouping [(a,()),(b,())] of
 -- | 'Ord' equipped with a compatible stable, ordered discriminator.
 class Grouping a => Sorting a where
   sorting :: Disc a
+#ifndef HLINT
   default sorting :: Deciding Sorting a => Disc a
   sorting = deciding (Proxy :: Proxy Sorting) sorting
+#endif
 
 instance Sorting Word8 where
   sorting = contramap fromIntegral (sortingNat 256)
@@ -190,8 +196,10 @@ instance (Sorting1 f, Sorting1 g, Sorting a) => Sorting (Compose f g a) where
 
 class Grouping1 f => Sorting1 f  where
   sorting1 :: Disc a -> Disc (f a)
+#ifndef HLINT
   default sorting1 :: Deciding1 Sorting f => Disc a -> Disc (f a)
   sorting1 = deciding1 (Proxy :: Proxy Sorting) sorting
+#endif
 
 instance (Sorting1 f, Sorting1 g) => Sorting1 (Compose f g) where
   sorting1 f = getCompose `contramap` sorting1 (sorting1 f)

@@ -2,13 +2,13 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE BangPatterns #-}
+-- {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE UnboxedTuples #-}
+-- {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ParallelListComp #-}
+-- {-# LANGUAGE ParallelListComp #-}
 {-# LANGUAGE UnliftedFFITypes #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -59,7 +59,9 @@ import GHC.STRef (STRef(STRef))
 newtype Disc a = Disc { runDisc :: forall b. [(a,b)] -> [[b]] }
   deriving Typeable
 
+#ifndef HLINT
 type role Disc representational
+#endif
 
 instance Contravariant Disc where
   contramap f (Disc g) = Disc $ g . map (first f)
