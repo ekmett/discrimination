@@ -8,12 +8,14 @@ module Data.Discrimination.Class
   , groupingColl
   , groupingBag
   , groupingSet
+  , equated
     -- * Ordered Discrimination
   , Sorting(..)
   , Sorting1(..)
   , sortingColl
   , sortingBag
   , sortingSet
+  , compared
   ) where
 
 import Data.Bits
@@ -32,7 +34,9 @@ import Data.Void
 import Data.Word
 import Prelude hiding (read)
 
+--------------------------------------------------------------------------------
 -- * Unordered Discrimination (for partitioning)
+--------------------------------------------------------------------------------
 
 -- | 'Eq' equipped with a compatible stable unordered discriminator.
 class Grouping a where
@@ -110,7 +114,16 @@ instance (Grouping1 f, Grouping1 g) => Grouping1 (Compose f g) where
 instance Grouping1 Complex where
   grouping1 f = divide (\(a :+ b) -> (a, b)) f f
 
+-- | Valid definition for @('==')@ in terms of 'Grouping'.
+equated :: Grouping a => a -> a -> Bool
+equated a b = case runDisc grouping [(a,()),(b,())] of
+  _:_:_ -> False
+  _ -> True
+{-# INLINE equated #-}
+
+--------------------------------------------------------------------------------
 -- * Ordered Discrimination
+--------------------------------------------------------------------------------
 
 -- | 'Ord' equipped with a compatible stable, ordered discriminator.
 class Grouping a => Sorting a where
@@ -181,6 +194,17 @@ instance (Sorting1 f, Sorting1 g) => Sorting1 (Compose f g) where
 instance Sorting1 []
 instance Sorting1 Maybe
 instance Sorting a => Sorting1 (Either a)
+
+-- | Valid definition for 'compare' in terms of 'Sorting'.
+compared :: Sorting a => a -> a -> Ordering
+compared a b = case runDisc sorting [(a,LT),(b,GT)] of
+  [r]:_ -> r
+  _     -> EQ
+{-# INLINE compared #-}
+
+--------------------------------------------------------------------------------
+-- * Collections
+--------------------------------------------------------------------------------
 
 sortingColl :: Foldable f => ([Int] -> Int -> [Int]) -> Disc k -> Disc (f k)
 sortingColl update r = Disc $ \xss -> let
