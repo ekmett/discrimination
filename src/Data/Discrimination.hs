@@ -1,35 +1,45 @@
 module Data.Discrimination
   ( 
-  -- * Type
-    Disc(..)
-  , desc
-  -- * Discriminators
-  -- ** Unordered
+  -- * Discrimination
+    Discriminating(..)
+  -- * Unordered
+  , Group(..)
   , Grouping(..)
   , Grouping1(..)
+  , nub
+  , nubWith
+  , group
+  , groupWith
   , groupingBag
   , groupingSet
   , groupingEq
-  -- ** Ordered
+  -- * Ordered
+  , Sort(..)
   , Sorting(..)
   , Sorting1(..)
+  , desc
+  , sort
+  , sortWith
   , sortingBag
   , sortingSet
   , sortingCompare
-  -- * Combinators
-  -- ** Unordered
-  , nub, nubWith, group, groupWith
-  -- ** Ordered
-  , sort, sortWith
-  -- * Containers
-  , toMap, toMapWith, toMapWithKey
-  , toIntMap, toIntMapWith, toIntMapWithKey
+  -- * Container Construction
+  , toMap
+  , toMapWith
+  , toMapWithKey
+  , toIntMap
+  , toIntMapWith
+  , toIntMapWithKey
   , toSet
   , toIntSet
   -- * Joins
-  , joining, inner, outer, leftOuter, rightOuter
+  , joining
+  , inner
+  , outer
+  , leftOuter
+  , rightOuter
   ) where
 
 import Data.Discrimination.Class
-import Data.Discrimination.Combinators
-import Data.Discrimination.Type
+import Data.Discrimination.Grouping
+import Data.Discrimination.Sorting

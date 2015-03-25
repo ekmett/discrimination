@@ -36,8 +36,9 @@ library
   exposed-modules:
     Data.Discrimination
     Data.Discrimination.Class
-    Data.Discrimination.Combinators
-    Data.Discrimination.Type
+    Data.Discrimination.Grouping
+    Data.Discrimination.Internal
+    Data.Discrimination.Sorting
 
   build-depends:
     adjunctions,
