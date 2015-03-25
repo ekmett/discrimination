@@ -234,7 +234,7 @@ groupingSet :: Foldable f => Disc k -> Disc (f k)
 groupingSet = groupingColl updateSet
 
 --------------------------------------------------------------------------------
--- * Utilities 
+-- * Utilities
 --------------------------------------------------------------------------------
 
 runs :: Eq a => [(a,b)] -> [[b]]
