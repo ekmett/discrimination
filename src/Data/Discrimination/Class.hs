@@ -12,6 +12,7 @@ import Control.Applicative
 import Control.Arrow
 import Data.Functor.Contravariant.Divisible
 import Data.Discrimination.Grouping
+import Data.Discrimination.Internal
 import Data.Discrimination.Sorting
 import Data.Maybe (catMaybes)
 
@@ -125,15 +126,3 @@ rightOuter m abc bc ad bd as bs = catMaybes $ joining m go ad bd as bs where
     | Prelude.null bp = Nothing
     | Prelude.null ap = Just (bc <$> bp)
     | otherwise = Just (liftA2 abc ap bp)
-
---------------------------------------------------------------------------------
--- * Unexported Utilities
---------------------------------------------------------------------------------
-
--- | Optimized and CPS'd version of 'Data.Either.partitionEithers', where all lefts are known to come before all rights
-spanEither :: ([a] -> [b] -> c) -> [Either a b] -> c
-spanEither k xs0 = go [] xs0 where
-  go acc (Left x:xs) = go (x:acc) xs
-  go acc rights = k (reverse acc) (fromRight <$> rights)
-  fromRight (Right y) = y
-  fromRight _ = error "spanEither: unstable"

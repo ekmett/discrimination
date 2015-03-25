@@ -6,6 +6,7 @@ module Data.Discrimination.Internal
   , bdiscNat
   , updateBag
   , updateSet
+  , spanEither
   ) where
 
 import Data.Array as Array
@@ -44,3 +45,13 @@ updateSet [] w = [w]
 updateSet vs@(v:_) w
   | v == w    = vs
   | otherwise = w : vs
+
+-- | Optimized and CPS'd version of 'Data.Either.partitionEithers', where all lefts are known to come before all rights
+spanEither :: ([a] -> [b] -> c) -> [Either a b] -> c
+spanEither k xs0 = go [] xs0 where
+  go acc (Left x:xs) = go (x:acc) xs
+  go acc rights = k (reverse acc) (fromRight <$> rights)
+
+fromRight :: Either a b -> b
+fromRight (Right y) = y
+fromRight _ = error "unstable discriminator"
