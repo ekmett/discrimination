@@ -8,14 +8,14 @@ module Data.Discrimination.Class
   , groupingColl
   , groupingBag
   , groupingSet
-  , equated
+  , groupingEq
     -- * Ordered Discrimination
   , Sorting(..)
   , Sorting1(..)
   , sortingColl
   , sortingBag
   , sortingSet
-  , compared
+  , sortingCompare
   ) where
 
 import Control.Monad ((<=<), join)
@@ -134,11 +134,11 @@ instance Grouping1 Complex where
   grouping1 f = divide (\(a :+ b) -> (a, b)) f f
 
 -- | Valid definition for @('==')@ in terms of 'Grouping'.
-equated :: Grouping a => a -> a -> Bool
-equated a b = case runDisc grouping [(a,()),(b,())] of
+groupingEq :: Grouping a => a -> a -> Bool
+groupingEq a b = case runDisc grouping [(a,()),(b,())] of
   _:_:_ -> False
   _ -> True
-{-# INLINE equated #-}
+{-# INLINE groupingEq #-}
 
 --------------------------------------------------------------------------------
 -- * Ordered Discrimination
@@ -218,11 +218,11 @@ instance Sorting1 Maybe
 instance Sorting a => Sorting1 (Either a)
 
 -- | Valid definition for 'compare' in terms of 'Sorting'.
-compared :: Sorting a => a -> a -> Ordering
-compared a b = case runDisc sorting [(a,LT),(b,GT)] of
+sortingCompare :: Sorting a => a -> a -> Ordering
+sortingCompare a b = case runDisc sorting [(a,LT),(b,GT)] of
   [r]:_ -> r
   _     -> EQ
-{-# INLINE compared #-}
+{-# INLINE sortingCompare #-}
 
 --------------------------------------------------------------------------------
 -- * Collections

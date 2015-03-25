@@ -8,12 +8,12 @@ module Data.Discrimination
   , Grouping1(..)
   , groupingBag
   , groupingSet
-  , equated
+  , groupingEq
   , Sorting(..)
   , Sorting1(..)
   , sortingBag
   , sortingSet
-  , compared
+  , sortingCompare
   -- * Other Modules
   , module Data.Discrimination.Combinators
   ) where
