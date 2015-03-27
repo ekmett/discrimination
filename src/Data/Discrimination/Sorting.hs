@@ -99,6 +99,11 @@ instance Monoid (Sort a) where
 
 -- | 'Ord' equipped with a compatible stable, ordered discriminator.
 class Grouping a => Sorting a where
+  -- | For every strictly monotone-increasing function @f@:
+  --
+  -- @
+  -- 'contramap' f 'sorting' ≡ 'sorting'
+  -- @
   sorting :: Sort a
 #ifndef HLINT
   default sorting :: Deciding Sorting a => Sort a

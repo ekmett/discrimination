@@ -173,6 +173,12 @@ groupingIORef = coerce (groupingSTRef :: Group Addr -> Group (STRef RealWorld a)
 
 -- | 'Eq' equipped with a compatible stable unordered discriminator.
 class Grouping a where
+  -- | For every surjection @f@,
+  --
+  -- @
+  -- 'contramap' f 'grouping' ≡ 'grouping'
+  -- @
+
   grouping :: Group a
 #ifndef HLINT
   default grouping :: Deciding Grouping a => Group a
