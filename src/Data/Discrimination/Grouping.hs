@@ -51,17 +51,6 @@ import qualified Data.Vector.Mutable as UM
 import Data.Void
 import Data.Word
 import Prelude hiding (read, concat)
-{-
-import Data.Coerce
-import Data.Primitive.Types (Addr(..))
-import GHC.IO (IO(IO))
-import qualified Data.Vector.Primitive as P
-import qualified Data.Vector.Primitive.Mutable as PM
-import Data.Primitive.ByteArray (MutableByteArray(MutableByteArray))
-import GHC.Prim (Any, State#, RealWorld, MutableByteArray#, Int#)
-import GHC.IORef (IORef(IORef))
-import GHC.STRef (STRef(STRef))
--}
 
 -- | Discriminator
 
@@ -126,25 +115,6 @@ groupingNat = \ n -> Group $ \xs -> runLazy (\r -> liftST (UM.replicate n Nothin
 groupingShort :: Group Int
 groupingShort = groupingNat 65536
 {-# NOINLINE groupingShort #-}
-
-{-
-foreign import prim "walk" walk :: Any -> MutableByteArray# s -> State# s -> (# State# s, Int# #)
-
-groupingSTRef :: Group Addr -> Group (STRef s a)
-groupingSTRef (Group f) = Group $ \xs ->
-  let force !n !(!(STRef !_,_):ys) = force (n + 1) ys
-      force !n [] = n
-  in case force 0 xs of
-   !n -> unsafePerformIO $ do
-     mv@(PM.MVector _ _ (MutableByteArray mba)) <- PM.new n :: IO (PM.MVector RealWorld Addr)
-     IO $ \s -> case walk (unsafeCoerce xs) mba s of (# s', _ #) -> (# s', () #)
-     ys <- P.freeze mv
-     return $ f [ (a,snd kv) | kv <- xs | a <- P.toList ys ]
-{-# NOINLINE groupingSTRef #-}
-
-groupingIORef :: forall a. Group Addr -> Group (IORef a)
-groupingIORef = coerce (groupingSTRef :: Group Addr -> Group (STRef RealWorld a))
--}
 
 --------------------------------------------------------------------------------
 -- * Unordered Discrimination (for partitioning)
