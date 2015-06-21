@@ -31,6 +31,7 @@ module Data.Discrimination.Grouping
 
 import Control.Arrow
 import Control.Monad
+import Control.Monad.ST.Class
 import Data.Bits
 import Data.Complex
 import Data.Discrimination.Internal
@@ -40,19 +41,16 @@ import Data.Functor.Compose
 import Data.Functor.Contravariant
 import Data.Functor.Contravariant.Divisible
 import Data.Functor.Contravariant.Generic
-import Data.IORef (IORef, newIORef, atomicModifyIORef)
 import Data.Int
 import Data.Monoid hiding (Any)
+import Data.Promise
 import Data.Proxy
 import Data.Ratio
 import Data.Typeable
 import qualified Data.Vector.Mutable as UM
 import Data.Void
 import Data.Word
-import GHC.Prim (Any, RealWorld)
 import Prelude hiding (read, concat)
-import System.IO.Unsafe
-import Unsafe.Coerce
 {-
 import Data.Coerce
 import Data.Primitive.Types (Addr(..))
@@ -106,43 +104,25 @@ instance Monoid (Group a) where
 -- Primitives
 --------------------------------------------------------------------------------
 
--- | Perform stable unordered discrimination by bucket.
---
--- This reuses arrays unlike the more obvious ST implementation, so it wins by
--- a huge margin in a race, especially when we have a large
--- keyspace, sparsely used, with low contention.
--- This will leak a number of arrays equal to the maximum concurrent
--- contention for this resource. If this becomes a bottleneck we can
--- make multiple stacks of working pads and index the stack with the
--- hash of the current thread id to reduce contention at the expense
--- of taking more memory.
---
--- You should create a thunk that holds the discriminator from @groupingNat n@
--- for a known @n@ and then reuse it.
+-- | Perform productive stable unordered discrimination by bucket.
 groupingNat :: Int -> Group Int
-groupingNat n = unsafePerformIO $ do
-    ts <- newIORef ([] :: [UM.MVector RealWorld [Any]])
-    return $ Group $ go ts
+groupingNat = \ n -> Group $ \xs -> runLazy (\r -> liftST (UM.replicate n Nothing) >>= go xs r) []
   where
-    step1 t keys (k, v) = UM.read t k >>= \vs -> case vs of
-      [] -> (k:keys) <$ UM.write t k [v]
-      _  -> keys     <$ UM.write t k (v:vs)
-    step2 t vss k = do
-      es <- UM.read t k
-      (reverse es : vss) <$ UM.write t k []
-    go :: IORef [UM.MVector RealWorld [Any]] -> [(Int, b)] -> [[b]]
-    go ts xs = unsafePerformIO $ do
-      mt <- atomicModifyIORef ts $ \case
-        (y:ys) -> (ys, Just y)
-        []     -> ([], Nothing)
-      t <- maybe (UM.replicate n []) (return . unsafeCoerce) mt
-      ys <- foldM (step1 t) [] xs
-      zs <- foldM (step2 t) [] ys
-      atomicModifyIORef ts $ \ws -> (unsafeCoerce t:ws, ())
-      return zs
-    {-# NOINLINE go #-}
-{-# NOINLINE groupingNat #-}
-
+    go :: [(Int,b)] -> Promise s [[b]] -> UM.MVector s (Maybe (Promise s [b])) -> Lazy s ()
+    go [] _ _ = return ()
+    go ((k,v):kvs) r t = liftST (UM.read t k) >>= \vs -> case vs of
+      Just p -> do
+         q <- promise []
+         p != v : demand q
+         liftST $ UM.write t k $ Just q
+         go kvs r t
+      Nothing -> do
+         q <- promise []
+         liftST $ UM.write t k $ Just q
+         r' <- promise []
+         r != (v : demand q) : demand r'
+         go kvs r' t
+  
 -- | Shared bucket set for small integers
 groupingShort :: Group Int
 groupingShort = groupingNat 65536
