@@ -57,9 +57,8 @@ demand (Promise _ a) = a
 type role Lazy nominal representational
 newtype Lazy s a = Lazy { getLazy :: forall x. MVar (Maybe (IO (K s x))) -> IO (K s a) }
 
-
 drive :: a -> MVar (Maybe (IO (K s x))) -> MVar a -> a
-drive d = \mv v -> unsafePerformIO $ tryTakeMVar v >>= \case
+drive d mv v = unsafePerformIO $ tryTakeMVar v >>= \case
   Just a -> return a -- if we're satisfied give the answer
   Nothing -> takeMVar mv >>= \case -- grab the lock on this computation
     Nothing -> do -- it has nothing left to do, so we fail to the default answer
@@ -70,19 +69,19 @@ drive d = \mv v -> unsafePerformIO $ tryTakeMVar v >>= \case
         putMVar mv (Just k) -- if so, restore the continuation, and return the answer
         return a
       Nothing -> do
-        mk <- pump k v
+        mk <- pump d k v
         putMVar mv mk
         case mk of
           Nothing -> return d
           Just _  -> takeMVar v
-  where
-    pump :: IO (K s x) -> MVar a -> IO (Maybe (IO (K s x)))
-    pump m v = m >>= \case
-      Pure a        -> return Nothing
-      Fulfilled u n -> case meq u v of
-        Just Refl -> return (Just n)
-        Nothing   -> pump n v
 {-# NOINLINE drive #-}
+
+pump :: a -> IO (K s x) -> MVar a -> IO (Maybe (IO (K s x)))
+pump d m v = m >>= \case
+  Pure a        -> return Nothing
+  Fulfilled u n -> case meq u v of
+    Just Refl -> return (Just n)
+    Nothing   -> pump d n v
 
 -- | Promise that by the end of the computation we'll provide a "real" answer, or we'll fall back and give you this answer
 promise :: a -> Lazy s (Promise s a)
@@ -127,6 +126,7 @@ runLazy f d = unsafePerformIO $ do
   let iv = Promise v (drive d mv v)
   putMVar mv (Just (getLazy (f iv) mv))
   return $ demand iv
+{-# NOINLINE runLazy #-}
 
 runLazy_ :: (forall s. Promise s a -> Lazy s ()) -> a
 runLazy_ k = runLazy k $ throw BrokenPromise
