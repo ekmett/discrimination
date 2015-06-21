@@ -21,7 +21,7 @@ before_install:
 
 install:
  - travis_retry cabal update
- - cabal install --only-dependencies
+ - cabal install --only-dependencies --force
 
 # Here starts the actual work to be performed for the package under
 # test; any command which exits with a non-zero exit code causes the
