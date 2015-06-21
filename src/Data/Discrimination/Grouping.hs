@@ -106,22 +106,21 @@ instance Monoid (Group a) where
 
 -- | Perform productive stable unordered discrimination by bucket.
 groupingNat :: Int -> Group Int
-groupingNat = \ n -> Group $ \xs -> runLazy (\r -> liftST (UM.replicate n Nothing) >>= go xs r) []
-  where
-    go :: [(Int,b)] -> Promise s [[b]] -> UM.MVector s (Maybe (Promise s [b])) -> Lazy s ()
-    go [] _ _ = return ()
-    go ((k,v):kvs) r t = liftST (UM.read t k) >>= \vs -> case vs of
-      Just p -> do
-         q <- promise []
-         p != v : demand q
-         liftST $ UM.write t k $ Just q
-         go kvs r t
-      Nothing -> do
-         q <- promise []
-         liftST $ UM.write t k $ Just q
-         r' <- promise []
-         r != (v : demand q) : demand r'
-         go kvs r' t
+groupingNat = \ n -> Group $ \xs -> runLazy (\r -> liftST (UM.replicate n Nothing) >>= go xs r) [] where
+  go :: [(Int,b)] -> Promise s [[b]] -> UM.MVector s (Maybe (Promise s [b])) -> Lazy s ()
+  go [] _ _ = return ()
+  go ((k,v):kvs) r t = liftST (UM.read t k) >>= \vs -> case vs of
+    Just p -> do
+      q <- promise []
+      p != v : demand q
+      liftST $ UM.write t k $ Just q
+      go kvs r t
+    Nothing -> do
+      q <- promise []
+      liftST $ UM.write t k $ Just q
+      r' <- promise []
+      r != (v : demand q) : demand r'
+      go kvs r' t
   
 -- | Shared bucket set for small integers
 groupingShort :: Group Int
