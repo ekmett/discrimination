@@ -24,6 +24,7 @@ module Data.Discrimination.Grouping
   , groupingEq
   , runGroup
   -- * Internals
+  , hashing
   , groupingNat
   ) where
 
