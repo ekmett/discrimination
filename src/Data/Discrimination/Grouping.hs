@@ -30,15 +30,12 @@ module Data.Discrimination.Grouping
   , groupingNat
   ) where
 
--- import Control.Arrow
 import Control.Monad hiding (mapM_)
 import Control.Monad.Primitive
 import Control.Monad.ST
--- import Data.Bits
+import Data.Bits
 import Data.Complex
--- import Data.Discrimination.Internal
 import Data.Foldable hiding (concat)
--- import Data.Functor
 import Data.Functor.Compose
 import Data.Functor.Contravariant
 import Data.Functor.Contravariant.Divisible
@@ -139,23 +136,15 @@ instance Grouping Word16 where
   grouping = contramap fromIntegral groupingShort
 
 instance Grouping Word32 where
-  grouping = undefined
-{-
-  grouping = Group (runs <=< runGroup groupingShort . join . runGroup groupingShort . map radices) where
-    radices (x,b) = (fromIntegral x .&. 0xffff, (fromIntegral (unsafeShiftR x 16), (x,b)))
--}
+  grouping = divide (\x -> (fromIntegral (unsafeShiftR x 16), fromIntegral x .&. 0xffff)) (groupingNat 65536) (groupingNat 65536)
 
 instance Grouping Word64 where
-  grouping = undefined
-{-
-  grouping = Group (runs <=< runGroup groupingShort . join . runGroup groupingShort . join
-                          . runGroup groupingShort . join . runGroup groupingShort . map radices)
-    where
-      radices (x,b) = (fromIntegral x .&. 0xffff, (fromIntegral (unsafeShiftR x 16) .&. 0xffff
-                    , (fromIntegral (unsafeShiftR x 32) .&. 0xffff, (fromIntegral (unsafeShiftR x 48)
-                    , (x,b)))))
--}
-
+  grouping = divide (\x -> ( (fromIntegral (unsafeShiftR x 48)           , fromIntegral (unsafeShiftR x 32) .&. 0xffff)
+                           , (fromIntegral (unsafeShiftR x 16) .&. 0xffff, fromIntegral x                   .&. 0xffff)
+                           )
+                    )
+    (divide id (groupingNat 65536) (groupingNat 65536))
+    (divide id (groupingNat 65536) (groupingNat 65536))
 
 instance Grouping Word where
   grouping
