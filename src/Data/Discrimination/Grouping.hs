@@ -123,18 +123,28 @@ instance Grouping Word8 where
   grouping = contramap fromIntegral (groupingNat 256)
 
 instance Grouping Word16 where
-  grouping = contramap fromIntegral (groupingNat 65536)
+  grouping = divide (\x -> (fromIntegral (unsafeShiftR x 8), fromIntegral x .&. 0xff)) (groupingNat 256) (groupingNat 256)
 
 instance Grouping Word32 where
-  grouping = divide (\x -> (fromIntegral (unsafeShiftR x 16), fromIntegral x .&. 0xffff)) (groupingNat 65536) (groupingNat 65536)
-
-instance Grouping Word64 where
-  grouping = divide (\x -> ( (fromIntegral (unsafeShiftR x 48)           , fromIntegral (unsafeShiftR x 32) .&. 0xffff)
-                           , (fromIntegral (unsafeShiftR x 16) .&. 0xffff, fromIntegral x                   .&. 0xffff)
+  grouping = divide (\x -> ( (fromIntegral (unsafeShiftR x 24)        , fromIntegral (unsafeShiftR x 16) .&. 0xff)
+                           , (fromIntegral (unsafeShiftR x 8) .&. 0xff, fromIntegral x                   .&. 0xff)
                            )
                     )
-    (divide id (groupingNat 65536) (groupingNat 65536))
-    (divide id (groupingNat 65536) (groupingNat 65536))
+    (divide id (groupingNat 256) (groupingNat 256))
+    (divide id (groupingNat 256) (groupingNat 256))
+
+instance Grouping Word64 where
+  grouping = divide (\x ->
+      ( ( (fromIntegral (unsafeShiftR x 56)         , fromIntegral (unsafeShiftR x 48) .&. 0xff)
+        , (fromIntegral (unsafeShiftR x 40) .&. 0xff, fromIntegral (unsafeShiftR x 32) .&. 0xff)
+        ),
+        ( (fromIntegral (unsafeShiftR x 24) .&. 0xff, fromIntegral (unsafeShiftR x 16) .&. 0xff)
+        , (fromIntegral (unsafeShiftR x 8)  .&. 0xff, fromIntegral x                   .&. 0xff)
+        )
+      )
+    )
+    (divide id (divide id (groupingNat 256) (groupingNat 256)) (divide id (groupingNat 256) (groupingNat 256)))
+    (divide id (divide id (groupingNat 256) (groupingNat 256)) (divide id (groupingNat 256) (groupingNat 256)))
 
 instance Grouping Word where
   grouping
@@ -145,7 +155,7 @@ instance Grouping Int8 where
   grouping = contramap (\x -> fromIntegral x + 128) (groupingNat 256)
 
 instance Grouping Int16 where
-  grouping = contramap (\x -> fromIntegral x + 32768) (groupingNat 65536)
+  grouping = contramap (\x -> fromIntegral (x - minBound) :: Word16) grouping
 
 instance Grouping Int32 where
   grouping = contramap (\x -> fromIntegral (x - minBound) :: Word32) grouping
