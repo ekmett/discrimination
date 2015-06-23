@@ -19,38 +19,39 @@
 <a name="line-10"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>nubWith</span>
 <a name="line-11"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>group</span>
 <a name="line-12"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>groupWith</span>
-<a name="line-13"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>groupingBag</span>
-<a name="line-14"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>groupingSet</span>
-<a name="line-15"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>groupingEq</span>
-<a name="line-16"></a>  <span class='hs-comment'>-- * Ordered</span>
-<a name="line-17"></a>  <span class='hs-layout'>,</span> <span class='hs-conid'>Sort</span><span class='hs-layout'>(</span><span class='hs-keyglyph'>..</span><span class='hs-layout'>)</span>
-<a name="line-18"></a>  <span class='hs-layout'>,</span> <span class='hs-conid'>Sorting</span><span class='hs-layout'>(</span><span class='hs-keyglyph'>..</span><span class='hs-layout'>)</span>
-<a name="line-19"></a>  <span class='hs-layout'>,</span> <span class='hs-conid'>Sorting1</span><span class='hs-layout'>(</span><span class='hs-keyglyph'>..</span><span class='hs-layout'>)</span>
-<a name="line-20"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>desc</span>
-<a name="line-21"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>sort</span>
-<a name="line-22"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>sortWith</span>
-<a name="line-23"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>sortingBag</span>
-<a name="line-24"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>sortingSet</span>
-<a name="line-25"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>sortingCompare</span>
-<a name="line-26"></a>  <span class='hs-comment'>-- * Container Construction</span>
-<a name="line-27"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>toMap</span>
-<a name="line-28"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>toMapWith</span>
-<a name="line-29"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>toMapWithKey</span>
-<a name="line-30"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>toIntMap</span>
-<a name="line-31"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>toIntMapWith</span>
-<a name="line-32"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>toIntMapWithKey</span>
-<a name="line-33"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>toSet</span>
-<a name="line-34"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>toIntSet</span>
-<a name="line-35"></a>  <span class='hs-comment'>-- * Joins</span>
-<a name="line-36"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>joining</span>
-<a name="line-37"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>inner</span>
-<a name="line-38"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>outer</span>
-<a name="line-39"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>leftOuter</span>
-<a name="line-40"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>rightOuter</span>
-<a name="line-41"></a>  <span class='hs-layout'>)</span> <span class='hs-keyword'>where</span>
-<a name="line-42"></a>
-<a name="line-43"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Data</span><span class='hs-varop'>.</span><span class='hs-conid'>Discrimination</span><span class='hs-varop'>.</span><span class='hs-conid'>Class</span>
-<a name="line-44"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Data</span><span class='hs-varop'>.</span><span class='hs-conid'>Discrimination</span><span class='hs-varop'>.</span><span class='hs-conid'>Grouping</span>
-<a name="line-45"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Data</span><span class='hs-varop'>.</span><span class='hs-conid'>Discrimination</span><span class='hs-varop'>.</span><span class='hs-conid'>Sorting</span>
+<a name="line-13"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>runGroup</span>
+<a name="line-14"></a>  <span class='hs-comment'>-- , groupingBag</span>
+<a name="line-15"></a>  <span class='hs-comment'>-- , groupingSet</span>
+<a name="line-16"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>groupingEq</span>
+<a name="line-17"></a>  <span class='hs-comment'>-- * Ordered</span>
+<a name="line-18"></a>  <span class='hs-layout'>,</span> <span class='hs-conid'>Sort</span><span class='hs-layout'>(</span><span class='hs-keyglyph'>..</span><span class='hs-layout'>)</span>
+<a name="line-19"></a>  <span class='hs-layout'>,</span> <span class='hs-conid'>Sorting</span><span class='hs-layout'>(</span><span class='hs-keyglyph'>..</span><span class='hs-layout'>)</span>
+<a name="line-20"></a>  <span class='hs-layout'>,</span> <span class='hs-conid'>Sorting1</span><span class='hs-layout'>(</span><span class='hs-keyglyph'>..</span><span class='hs-layout'>)</span>
+<a name="line-21"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>desc</span>
+<a name="line-22"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>sort</span>
+<a name="line-23"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>sortWith</span>
+<a name="line-24"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>sortingBag</span>
+<a name="line-25"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>sortingSet</span>
+<a name="line-26"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>sortingCompare</span>
+<a name="line-27"></a>  <span class='hs-comment'>-- * Container Construction</span>
+<a name="line-28"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>toMap</span>
+<a name="line-29"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>toMapWith</span>
+<a name="line-30"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>toMapWithKey</span>
+<a name="line-31"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>toIntMap</span>
+<a name="line-32"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>toIntMapWith</span>
+<a name="line-33"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>toIntMapWithKey</span>
+<a name="line-34"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>toSet</span>
+<a name="line-35"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>toIntSet</span>
+<a name="line-36"></a>  <span class='hs-comment'>-- * Joins</span>
+<a name="line-37"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>joining</span>
+<a name="line-38"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>inner</span>
+<a name="line-39"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>outer</span>
+<a name="line-40"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>leftOuter</span>
+<a name="line-41"></a>  <span class='hs-layout'>,</span> <span class='hs-varid'>rightOuter</span>
+<a name="line-42"></a>  <span class='hs-layout'>)</span> <span class='hs-keyword'>where</span>
+<a name="line-43"></a>
+<a name="line-44"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Data</span><span class='hs-varop'>.</span><span class='hs-conid'>Discrimination</span><span class='hs-varop'>.</span><span class='hs-conid'>Class</span>
+<a name="line-45"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Data</span><span class='hs-varop'>.</span><span class='hs-conid'>Discrimination</span><span class='hs-varop'>.</span><span class='hs-conid'>Grouping</span>
+<a name="line-46"></a><span class='hs-keyword'>import</span> <span class='hs-conid'>Data</span><span class='hs-varop'>.</span><span class='hs-conid'>Discrimination</span><span class='hs-varop'>.</span><span class='hs-conid'>Sorting</span>
 </pre></body>
 </html>
