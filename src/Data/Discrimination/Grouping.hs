@@ -22,26 +22,30 @@ module Data.Discrimination.Grouping
   , nub, nubWith
   , group, groupWith
   , groupingEq
+  , runGroup
   -- * Internals
-  , groupingBag
-  , groupingSet
+--  , groupingBag
+--  , groupingSet
   , groupingShort
   , groupingNat
   ) where
 
-import Control.Arrow
-import Control.Monad
-import Data.Bits
+-- import Control.Arrow
+import Control.Monad hiding (mapM_)
+import Control.Monad.Primitive
+import Control.Monad.ST
+-- import Data.Bits
 import Data.Complex
-import Data.Discrimination.Internal
+-- import Data.Discrimination.Internal
 import Data.Foldable hiding (concat)
-import Data.Functor
+-- import Data.Functor
 import Data.Functor.Compose
 import Data.Functor.Contravariant
 import Data.Functor.Contravariant.Divisible
 import Data.Functor.Contravariant.Generic
 import Data.Int
 import Data.Monoid hiding (Any)
+import Data.Primitive.MutVar
 import Data.Promise
 import Data.Proxy
 import Data.Ratio
@@ -49,71 +53,63 @@ import Data.Typeable
 import qualified Data.Vector.Mutable as UM
 import Data.Void
 import Data.Word
-import Prelude hiding (read, concat)
+import Prelude hiding (read, concat, mapM_)
 
--- | Discriminator
+-- | Productive Stable Unordered Discriminator
 
--- TODO: use [(a,b)] -> [NonEmpty b] to better indicate safety?
-newtype Group a = Group { runGroup :: forall b. [(a,b)] -> [[b]] }
-  deriving Typeable
+newtype Group a = Group
+  { getGroup :: forall m b. PrimMonad m
+             => (b -> m (b -> m ())) -> m (a -> b -> m ())
+  } deriving Typeable
 
-#ifndef HLINT
-type role Group representational
-#endif
+-- #ifndef HLINT
+-- type role Group representational
+-- #endif
 
 instance Contravariant Group where
-  contramap f (Group g) = Group $ g . map (first f)
+  contramap f m = Group $ \k -> do
+    g <- getGroup m k
+    return (g . f)
 
 instance Divisible Group where
-  conquer = Group $ return . fmap snd
-  divide k (Group l) (Group r) = Group $ \xs ->
-    l [ (b, (c, d)) | (a,d) <- xs, let (b, c) = k a] >>= r
+  conquer = Group $ \ (k :: b -> m (b -> m ())) -> do
+    v <- newMutVar undefined
+    writeMutVar v $ \b -> k b >>= writeMutVar v
+    return $ \ _ b -> readMutVar v >>= ($ b)
+
+  divide f m n = Group $ \k -> do
+    kbcd <- getGroup m $ \ (c, d) -> do
+      kcd <- getGroup n k
+      kcd c d
+      return $ uncurry kcd
+    return $ \ a d -> case f a of
+      (b, c) -> kbcd b (c, d)
 
 instance Decidable Group where
-  lose k = Group $ fmap (absurd.k.fst)
-  choose f (Group l) (Group r) = Group $ \xs -> let
-      ys = zipWith (\n (a,d) -> (f a, (n, d))) [0..] xs
-    in l [ (k,p) | (Left k, p) <- ys ] `mix`
-       r [ (k,p) | (Right k, p) <- ys ]
+  choose f m n = Group $ \k -> do
+    kb <- getGroup m k
+    kc <- getGroup n k
+    return (either kb kc . f)
 
-mix :: [[(Int,b)]] -> [[(Int,b)]] -> [[b]]
-mix [] bs = fmap snd <$> bs
-mix as [] = fmap snd <$> as
-mix asss@(((n,a):as):ass) bsss@(((m,b):bs):bss)
-  | n < m     = (a:fmap snd as) : mix ass bsss
-  | otherwise = (b:fmap snd bs) : mix asss bss
-mix _ _ = error "bad discriminator"
+  lose k = Group $ \_ -> return (absurd . k)
 
 instance Monoid (Group a) where
   mempty = conquer
-  mappend (Group l) (Group r) = Group $ \xs -> l [ (fst x, x) | x <- xs ] >>= r
+  mappend = divide (\a -> (a,a))
 
 --------------------------------------------------------------------------------
 -- Primitives
 --------------------------------------------------------------------------------
 
--- | Perform productive stable unordered discrimination by bucket.
 groupingNat :: Int -> Group Int
-groupingNat = \ n -> Group $ \xs -> runLazy (\r -> UM.replicate n Nothing >>= go xs r) [] where
-  go :: [(Int,b)] -> Promise s [[b]] -> UM.MVector s (Maybe (Promise s [b])) -> Lazy s ()
-  go [] _ _ = return ()
-  go ((k,v):kvs) r t = UM.read t k >>= \vs -> case vs of
-    Just p -> do
-      q <- promise []
-      p != v : demand q
-      UM.write t k $ Just q
-      go kvs r t
-    Nothing -> do
-      q <- promise []
-      UM.write t k $ Just q
-      r' <- promise []
-      r != (v : demand q) : demand r'
-      go kvs r' t
-  
--- | Shared bucket set for small integers
+groupingNat = \ n -> Group $ \k -> do
+  t <- UM.replicate n Nothing
+  return $ \ a b -> UM.read t a >>= \case
+    Nothing -> k b >>= UM.write t a . Just
+    Just k' -> k' b
+
 groupingShort :: Group Int
 groupingShort = groupingNat 65536
-{-# NOINLINE groupingShort #-}
 
 --------------------------------------------------------------------------------
 -- * Unordered Discrimination (for partitioning)
@@ -137,22 +133,28 @@ instance Grouping Void where
   grouping = lose id
 
 instance Grouping Word8 where
-  grouping = contramap fromIntegral groupingShort
+  grouping = contramap fromIntegral (groupingNat 256)
 
 instance Grouping Word16 where
   grouping = contramap fromIntegral groupingShort
 
 instance Grouping Word32 where
+  grouping = undefined
+{-
   grouping = Group (runs <=< runGroup groupingShort . join . runGroup groupingShort . map radices) where
     radices (x,b) = (fromIntegral x .&. 0xffff, (fromIntegral (unsafeShiftR x 16), (x,b)))
+-}
 
 instance Grouping Word64 where
+  grouping = undefined
+{-
   grouping = Group (runs <=< runGroup groupingShort . join . runGroup groupingShort . join
                           . runGroup groupingShort . join . runGroup groupingShort . map radices)
     where
       radices (x,b) = (fromIntegral x .&. 0xffff, (fromIntegral (unsafeShiftR x 16) .&. 0xffff
                     , (fromIntegral (unsafeShiftR x 32) .&. 0xffff, (fromIntegral (unsafeShiftR x 48)
                     , (x,b)))))
+-}
 
 
 instance Grouping Word where
@@ -161,7 +163,7 @@ instance Grouping Word where
     | otherwise                        = contramap (fromIntegral :: Word -> Word64) grouping
 
 instance Grouping Int8 where
-  grouping = contramap (\x -> fromIntegral x + 128) groupingShort
+  grouping = contramap (\x -> fromIntegral x + 128) (groupingNat 256)
 
 instance Grouping Int16 where
   grouping = contramap (\x -> fromIntegral x + 32768) groupingShort
@@ -209,10 +211,34 @@ instance Grouping1 Complex where
 
 -- | Valid definition for @('==')@ in terms of 'Grouping'.
 groupingEq :: Grouping a => a -> a -> Bool
-groupingEq a b = case runGroup grouping [(a,()),(b,())] of
-  _:_:_ -> False
-  _ -> True
+groupingEq a b = runST $ do
+  rn <- newMutVar (0 :: Word8)
+  k <- getGroup grouping $ \_ -> do
+    modifyMutVar' rn (+1)
+    return return
+  k a ()
+  k b ()
+  n <- readMutVar rn
+  return $ n == 2
 {-# INLINE groupingEq #-}
+
+runGroup :: Group a -> [(a,b)] -> [[b]]
+runGroup (Group m) xs = runLazy (\p0 -> do
+    rp <- newMutVar p0
+    f <- m $ \ b -> do
+      p <- readMutVar rp
+      q <- promise []
+      p' <- promise []
+      p != (b : demand q) : demand p'
+      writeMutVar rp p'
+      rq <- newMutVar q
+      return $ \b' -> do
+        q' <- readMutVar rq
+        q'' <- promise []
+        q' != b' : demand q''
+        writeMutVar rq q''
+    mapM_ (uncurry f) xs
+  ) []
 
 --------------------------------------------------------------------------------
 -- * Combinators
@@ -220,7 +246,7 @@ groupingEq a b = case runGroup grouping [(a,()),(b,())] of
 
 -- | /O(n)/. Similar to 'Data.List.group', except we do not require groups to be clustered.
 --
--- This combinator still operates in linear time, at the expense of productivity.
+-- This combinator still operates in linear time, at the expense of storing history.
 --
 -- The result equivalence classes are _not_ sorted, but the grouping is stable.
 --
@@ -237,23 +263,33 @@ groupWith :: Grouping b => (a -> b) -> [a] -> [[a]]
 groupWith f as = runGroup grouping [(f a, a) | a <- as]
 
 -- | /O(n)/. This upgrades 'Data.List.nub' from @Data.List@ from /O(n^2)/ to /O(n)/ by using
--- unordered discrimination.
+-- productive unordered discrimination.
 --
 -- @
 -- 'nub' = 'nubWith' 'id'
 -- 'nub' as = 'head' 'Control.Applicative.<$>' 'group' as
 -- @
 nub :: Grouping a => [a] -> [a]
-nub as = head <$> group as
+nub = nubWith id
 
--- | /O(n)/. 'nub' with a Schwartzian transform.
+-- | /O(n)/. Online 'nub' with a Schwartzian transform.
 --
 -- @
 -- 'nubWith' f as = 'head' 'Control.Applicative.<$>' 'groupWith' f as
 -- @
 nubWith :: Grouping b => (a -> b) -> [a] -> [a]
-nubWith f as = head <$> groupWith f as
+nubWith f xs = runLazy (\p0 -> do
+    rp <- newMutVar p0
+    k <- getGroup grouping $ \a -> do
+      p' <- promise []
+      p <- readMutVar rp
+      p != a : demand p'
+      writeMutVar rp p'
+      return $ \ _ -> return ()
+    mapM_ (\x -> k (f x) x) xs
+  ) []
 
+{-
 --------------------------------------------------------------------------------
 -- * Collections
 --------------------------------------------------------------------------------
@@ -275,3 +311,4 @@ groupingColl update r = Group $ \xss -> let
     sigs                = bdiscNat (length kss) update keyNumElemNumAssocs
     yss                 = zip sigs vs
   in filter (not . null) $ grouping1 (groupingNat (length keyNumBlocks)) `runGroup` yss
+-}

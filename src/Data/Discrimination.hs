@@ -10,8 +10,9 @@ module Data.Discrimination
   , nubWith
   , group
   , groupWith
-  , groupingBag
-  , groupingSet
+  , runGroup
+  -- , groupingBag
+  -- , groupingSet
   , groupingEq
   -- * Ordered
   , Sort(..)
