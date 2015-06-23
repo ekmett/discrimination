@@ -24,9 +24,6 @@ module Data.Discrimination.Grouping
   , groupingEq
   , runGroup
   -- * Internals
---  , groupingBag
---  , groupingSet
-  , groupingShort
   , groupingNat
   ) where
 
@@ -58,10 +55,6 @@ newtype Group a = Group
   { getGroup :: forall m b. PrimMonad m
              => (b -> m (b -> m ())) -> m (a -> b -> m ())
   } deriving Typeable
-
--- #ifndef HLINT
--- type role Group representational
--- #endif
 
 instance Contravariant Group where
   contramap f m = Group $ \k -> do
@@ -105,9 +98,6 @@ groupingNat = \ n -> Group $ \k -> do
     Nothing -> k b >>= UM.write t a . Just
     Just k' -> k' b
 
-groupingShort :: Group Int
-groupingShort = groupingNat 65536
-
 --------------------------------------------------------------------------------
 -- * Unordered Discrimination (for partitioning)
 --------------------------------------------------------------------------------
@@ -133,7 +123,7 @@ instance Grouping Word8 where
   grouping = contramap fromIntegral (groupingNat 256)
 
 instance Grouping Word16 where
-  grouping = contramap fromIntegral groupingShort
+  grouping = contramap fromIntegral (groupingNat 65536)
 
 instance Grouping Word32 where
   grouping = divide (\x -> (fromIntegral (unsafeShiftR x 16), fromIntegral x .&. 0xffff)) (groupingNat 65536) (groupingNat 65536)
@@ -155,7 +145,7 @@ instance Grouping Int8 where
   grouping = contramap (\x -> fromIntegral x + 128) (groupingNat 256)
 
 instance Grouping Int16 where
-  grouping = contramap (\x -> fromIntegral x + 32768) groupingShort
+  grouping = contramap (\x -> fromIntegral x + 32768) (groupingNat 65536)
 
 instance Grouping Int32 where
   grouping = contramap (\x -> fromIntegral (x - minBound) :: Word32) grouping
@@ -278,26 +268,3 @@ nubWith f xs = runLazy (\p0 -> do
     mapM_ (\x -> k (f x) x) xs
   ) []
 
-{-
---------------------------------------------------------------------------------
--- * Collections
---------------------------------------------------------------------------------
-
--- | Construct an stable unordered discriminator that partitions into equivalence classes based on the equivalence of keys as a multiset.
-groupingBag :: Foldable f => Group k -> Group (f k)
-groupingBag = groupingColl updateBag
-
--- | Construct an stable unordered discriminator that partitions into equivalence classes based on the equivalence of keys as a set.
-groupingSet :: Foldable f => Group k -> Group (f k)
-groupingSet = groupingColl updateSet
-
-groupingColl :: Foldable f => ([Int] -> Int -> [Int]) -> Group k -> Group (f k)
-groupingColl update r = Group $ \xss -> let
-    (kss, vs)           = unzip xss
-    elemKeyNumAssocs    = groupNum (toList <$> kss)
-    keyNumBlocks        = runGroup r elemKeyNumAssocs
-    keyNumElemNumAssocs = groupNum keyNumBlocks
-    sigs                = bdiscNat (length kss) update keyNumElemNumAssocs
-    yss                 = zip sigs vs
-  in filter (not . null) $ grouping1 (groupingNat (length keyNumBlocks)) `runGroup` yss
--}
