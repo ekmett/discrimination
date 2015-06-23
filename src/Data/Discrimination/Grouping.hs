@@ -37,6 +37,7 @@ import Data.Functor.Compose
 import Data.Functor.Contravariant
 import Data.Functor.Contravariant.Divisible
 import Data.Functor.Contravariant.Generic
+import Data.Hashable
 import Data.Int
 import Data.Monoid hiding (Any)
 import Data.Primitive.MutVar
@@ -91,12 +92,37 @@ instance Monoid (Group a) where
 -- Primitives
 --------------------------------------------------------------------------------
 
+data GroupingState m b
+  = Zero
+  | One {-# UNPACK #-} !Int (b -> m ())
+  | Many (UM.MVector (PrimState m) (Maybe (b -> m ())))
+
 groupingNat :: Int -> Group Int
-groupingNat = \ n -> Group $ \k -> do
-  t <- UM.replicate n Nothing
-  return $ \ a b -> UM.read t a >>= \case
-    Nothing -> k b >>= UM.write t a . Just
-    Just k' -> k' b
+groupingNat n = Group $ \k -> do
+  mt <- newMutVar Zero
+  return $ \ a b -> readMutVar mt >>= \case
+    Zero -> k b >>= writeMutVar mt . One a
+    One az mz -> do
+      t <- UM.replicate n Nothing
+      UM.write t az (Just mz)
+      writeMutVar mt (Many t)
+      UM.read t a >>= \case
+        Nothing -> k b >>= UM.write t a . Just
+        Just k' -> k' b
+    Many t -> UM.read t a >>= \case
+      Nothing -> k b >>= UM.write t a . Just
+      Just k' -> k' b
+
+-- | This may be useful for pragmatically accelerating a grouping structure by
+-- preclassifying by a hash function
+--
+-- Semantically,
+--
+-- @
+-- grouping = hashing <> grouping
+-- @
+hashing :: Hashable a => Group a
+hashing = contramap hash grouping
 
 --------------------------------------------------------------------------------
 -- * Unordered Discrimination (for partitioning)
