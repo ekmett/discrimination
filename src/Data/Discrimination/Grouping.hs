@@ -103,13 +103,13 @@ groupingNat n = Group $ \k -> do
   mt <- newMutVar Zero
   return $ \ a b -> readMutVar mt >>= \case
     Zero -> k b >>= writeMutVar mt . One a
-    One az mz -> do
-      t <- UM.replicate n Nothing
-      UM.write t az (Just mz)
-      writeMutVar mt (Many t)
-      UM.read t a >>= \case
-        Nothing -> k b >>= UM.write t a . Just
-        Just k' -> k' b
+    One az mz
+      | az == a -> mz b
+      | otherwise -> do
+        t <- UM.replicate n Nothing
+        UM.write t az (Just mz)
+        writeMutVar mt (Many t)
+        k b >>= UM.write t a . Just
     Many t -> UM.read t a >>= \case
       Nothing -> k b >>= UM.write t a . Just
       Just k' -> k' b
