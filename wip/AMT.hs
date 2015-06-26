@@ -2,20 +2,26 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
-{-# OPTIONS_GHC -funbox-strict-fields #-}
-module AMT where
+{-# OPTIONS_GHC -funbox-strict-fields -O2 #-}
+module Main where
 
 import Control.Applicative
+import Control.DeepSeq
+import Control.Exception (evaluate)
 import Control.Monad.ST
+import Criterion.Main
 import Data.Bits
 import Data.Bits.Extras
-import Data.Foldable
+import Data.Foldable hiding (foldl')
 import Data.Functor
+import Data.List (foldl')
+import Data.Maybe (fromMaybe)
 import Data.Monoid
 import Data.Primitive.Array
 import Data.Traversable
 import Data.Word
 import Prelude hiding (lookup)
+import qualified Data.IntMap as M
 
 type Key = Word64
 type Mask = Word16
@@ -54,6 +60,11 @@ data WordMap v
   = Nil
   | Tip  !Key v
   | Node !Key !Offset !Mask !(Array (WordMap v))
+
+instance NFData v => NFData (WordMap v) where
+  rnf Nil = ()
+  rnf (Tip _ v) = rnf v
+  rnf (Node _ _ m a) = rnf (fromArray (popCount m) a)
 
 instance Show v => Show (WordMap v) where
   showsPrec _ Nil = showString "Nil"
@@ -119,7 +130,12 @@ lookup k (Tip ok ov)
 lookup k (Node ok o m a) 
   | d <- maskBit k o, testBit m d = lookup k $ indexArray a (offset d m)
   | otherwise = Nothing
-    
+
+member :: Key -> WordMap v -> Bool
+member _ Nil = False
+member k (Tip ok _) = k == ok
+member k (Node ok o m a) | d <- maskBit k o = testBit m d && member k (indexArray a (offset d m))
+  
 updateArray :: Int -> Int -> (a -> a) -> Array a -> Array a
 updateArray k n f i = runST $ do
   o <- newArray n undefined
@@ -147,3 +163,72 @@ two a b = runST $ do
 
 singleton :: Key -> v -> WordMap v
 singleton k v = Tip k v
+
+fromList :: [(Word64,v)] -> WordMap v
+fromList = foldl' (\r (k,v) -> insert k v r) Nil 
+
+main = do
+    let denseM = M.fromAscList elems :: M.IntMap Int
+        denseW = fromList welems :: WordMap Word64
+        sparseM = M.fromAscList sElems :: M.IntMap Int
+        sparseW = fromList wsElems :: WordMap Word64
+        sparseM' = M.fromAscList sElemsSearch :: M.IntMap Int
+        sparseW' = fromList wsElemsSearch :: WordMap Word64
+    evaluate $ rnf [denseM, sparseM, sparseM']
+    evaluate $ rnf [denseW, sparseW, sparseW']
+    evaluate $ rnf [elems,  sElems,  sElemsSearch]
+    evaluate $ rnf [keys,   sKeys,   sKeysSearch]
+    evaluate $ rnf [values, sValues]
+    evaluate $ rnf [welems,  wsElems,  wsElemsSearch]
+    evaluate $ rnf [wkeys,   wsKeys,   wsKeysSearch]
+    evaluate $ rnf [wvalues, wsValues]
+    defaultMain
+        [ bgroup "lookup"
+            [ bgroup "present"
+                [ bench "IntMap"  $ whnf (\m -> foldl' (\n k -> fromMaybe n (M.lookup k m)) 0 keys) denseM
+                , bench "WordMap" $ whnf (\m -> foldl' (\n k -> fromMaybe n (lookup k m)) 0 wkeys) denseW
+                ]
+            , bgroup "absent"
+                [ bench "IntMap"  $ whnf (\m -> foldl' (\n k -> fromMaybe n (M.lookup k m)) 0 sKeysSearch) sparseM
+                , bench "WordMap" $ whnf (\m -> foldl' (\n k -> fromMaybe n (lookup k m)) 0 wsKeysSearch) sparseW
+                ]
+            ]
+        , bgroup "member"
+            [ bgroup "present"
+                [ bench "IntMap"  $ whnf (\m -> foldl' (\n x -> if M.member x m then n + 1 else n) 0 keys) denseM
+                , bench "WordMap" $ whnf (\m -> foldl' (\n x -> if member x m then n + 1 else n) 0 wkeys) denseW
+                ]
+            , bgroup "absent"
+                [ bench "IntMap"  $ whnf (\m -> foldl' (\n x -> if M.member x m then n + 1 else n) 0 sKeysSearch) sparseM
+                , bench "WordMap" $ whnf (\m -> foldl' (\n x -> if member x m then n + 1 else n) 0 wsKeysSearch) sparseW
+                ]
+            ]
+        , bgroup "insert"
+            [ bgroup "present"
+                [ bench "IntMap"  $ whnf (\m -> foldl' (\m (k, v) -> M.insert k v m) m elems) denseM
+                , bench "WordMap" $ whnf (\m -> foldl' (\m (k, v) -> insert k v m) m welems) denseW
+                ]
+            , bgroup "absent"
+                [ bench "IntMap" $ whnf (\m -> foldl' (\m (k, v) -> M.insert k v m) m sElemsSearch) sparseM
+                , bench "WordMap" $ whnf (\m -> foldl' (\m (k, v) -> insert k v m) m wsElemsSearch) sparseW
+                ]
+            ]
+        ]
+  where
+    elems = zip keys values
+    keys = [1..2^12]
+    values = [1..2^12]
+    sElems = zip sKeys sValues
+    sElemsSearch = zip sKeysSearch sValues
+    sKeys = [1,3..2^12]
+    sKeysSearch = [2,4..2^12]
+    sValues = [1,3..2^12]
+
+    welems = zip wkeys wvalues
+    wkeys = [1..2^12]
+    wvalues = [1..2^12]
+    wsElems = zip wsKeys wsValues
+    wsElemsSearch = zip wsKeysSearch wsValues
+    wsKeys = [1,3..2^12]
+    wsKeysSearch = [2,4..2^12]
+    wsValues = [1,3..2^12]
