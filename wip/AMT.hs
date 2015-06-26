@@ -23,32 +23,6 @@ type Offset = Int
 
 pattern N = 16
 
-data WordMap v
-  = Nil
-  | Tip  !Key v
-  | Node !Key !Offset !Mask !(Array (WordMap v))
-
-instance Show v => Show (WordMap v) where
-  showsPrec _ Nil = showString "Nil"
-  showsPrec d (Tip k v) = showParen (d > 10) $
-     showString "Tip " . showsPrec 11 k . showChar ' ' . showsPrec 11 v
-  showsPrec d (Node k o m as) = showParen (d > 10) $
-     showString "Node " . showsPrec 11 k . showChar ' ' . showsPrec 11 o . showChar ' ' . showsPrec 11 m . showChar ' ' . showParen True 
-     (showString "toArray " . showsPrec 11 n . showChar ' ' . showsPrec 11 (fromArray n as))
-     where n = popCount m
-
--- Assumes n >= 1
-mapArray :: Int -> (a -> b) -> Array a -> Array b
-mapArray !n f !i = runST $ do
-  o <- newArray n undefined
-  let go 0 = return ()
-      go k = do
-        a <- indexArrayM i k 
-        writeArray o k (f a)
-        go (k - 1)
-  go (n-1)
-  unsafeFreezeArray o
-
 fromArray :: Int -> Array a -> [a]
 fromArray !n !arr = go 0 where
   go !k
@@ -62,6 +36,33 @@ toArray n xs0 = runST $ do
       go k (x:xs) = writeArray arr k x >> go (k+1) xs
   go 0 xs0
   unsafeFreezeArray arr
+
+-- Assumes n >= 1
+mapArray :: Int -> (a -> b) -> Array a -> Array b
+mapArray !n f !i = runST $ do
+  o <- newArray n undefined
+  let go k 
+        | k == n = return ()
+        | otherwise = do
+          a <- indexArrayM i k 
+          writeArray o k (f a)
+          go (k+1)
+  go 0
+  unsafeFreezeArray o
+
+data WordMap v
+  = Nil
+  | Tip  !Key v
+  | Node !Key !Offset !Mask !(Array (WordMap v))
+
+instance Show v => Show (WordMap v) where
+  showsPrec _ Nil = showString "Nil"
+  showsPrec d (Tip k v) = showParen (d > 10) $
+     showString "Tip " . showsPrec 11 k . showChar ' ' . showsPrec 11 v
+  showsPrec d (Node k o m as) = showParen (d > 10) $
+     showString "Node " . showsPrec 11 k . showChar ' ' . showsPrec 11 o . showChar ' ' . showsPrec 11 m . showChar ' ' . showParen True 
+     (showString "toArray " . showsPrec 11 n . showChar ' ' . showsPrec 11 (fromArray n as))
+     where n = popCount m
 
 instance Functor WordMap where
   fmap f = go where
@@ -81,7 +82,7 @@ instance Traversable WordMap where
     go (Tip k v) = Tip k <$> f v
     go (Node k o m a) = Node k o m . toArray n <$> traverse go (fromArray n a) where n = popCount m 
 
--- Note: 'level 0' will return a negative shift.
+-- Note: 'level 0' will return a negative shift, don't use it
 level :: Key -> Int
 level w = 60 - (nlz w .&. 0xfc)
 
@@ -104,10 +105,11 @@ insert k v ot@(Tip ok ov)
 insert k v on@(Node ok n m as)
   | o <- level (xor k ok)
   = if
-    | o > n -> Node k o (setBit (mask k o) (maskBit k o)) $ if k < ok then two (Tip k v) on else two on (Tip k v)
+    | o > n -> Node k o (setBit (mask k o) (maskBit ok o))
+             $ if k < ok then two (Tip k v) on else two on (Tip k v)
     | d <- maskBit k n -> if 
-      | testBit m (maskBit k n) -> Node ok n m            (updateArray d (popCount m) (insert k v) as)
-      | otherwise               -> Node ok n (setBit m d) (insertArray (offset d m) (popCount m) (Tip k v) as)
+      | testBit m d -> Node ok n m            (updateArray (offset d m) (popCount m) (insert k v) as)
+      | otherwise   -> Node ok n (setBit m d) (insertArray (offset d m) (popCount m) (Tip k v) as)
 
 lookup :: Key -> WordMap v -> Maybe v
 lookup _ Nil = Nothing
@@ -115,9 +117,8 @@ lookup k (Tip ok ov)
   | k == ok   = Just ov
   | otherwise = Nothing
 lookup k (Node ok o m a) 
-  | testBit m d = lookup k $ indexArray a (offset d m)
+  | d <- maskBit k o, testBit m d = lookup k $ indexArray a (offset d m)
   | otherwise = Nothing
-  where d = maskBit k o
     
 updateArray :: Int -> Int -> (a -> a) -> Array a -> Array a
 updateArray k n f i = runST $ do
