@@ -81,6 +81,13 @@ instance Show a => Show (Array a) where
   showsPrec d as = showParen (d > 10) $
     showString "fromListN " . showsPrec 11 (length as) . showChar ' ' . showsPrec 11 (Exts.toList as)
   
+instance NFData a => NFData (Array a) where
+  rnf a0 = go a0 (length a0) 0 where
+    go !a !n !i
+      | i >= n = ()
+      | otherwise = rnf (indexArray a i) `seq` go a n (i+1)
+  {-# INLINE rnf #-}
+
 data WordMap v
   = Nil
   | Tip  !Key v
@@ -95,8 +102,8 @@ node k o m a      = Node k o m a
 instance NFData v => NFData (WordMap v) where
   rnf Nil = ()
   rnf (Tip _ v) = rnf v
-  rnf (Node _ _ _ a) = rnf (Exts.toList a)
-  rnf (Full _ _ a) = rnf (Exts.toList a)
+  rnf (Node _ _ _ a) = rnf a
+  rnf (Full _ _ a)   = rnf a
 
 instance Functor WordMap where
   fmap f = go where
