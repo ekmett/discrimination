@@ -13,6 +13,7 @@ import Control.DeepSeq
 import Control.Exception (evaluate)
 import Control.Monad.ST
 import Criterion.Main
+import Criterion.Types
 import Data.Bits
 import Data.Foldable
 import Data.Functor
@@ -248,6 +249,7 @@ fromList xs = foldl' (\r (k,v) -> insert k v r) Nil xs
 
 main :: IO ()
 main = do
+
     let denseM = M.fromAscList elems :: M.IntMap Int
         denseW = fromList welems :: WordMap Word64
         denseH = H.fromList welems :: HashMap Word64 Word64
@@ -266,7 +268,7 @@ main = do
     evaluate $ rnf [welems,  wsElems,  wsElemsSearch]
     evaluate $ rnf [wkeys,   wsKeys, wsKeysSearch]
     evaluate $ rnf [wvalues, wsValues]
-    defaultMain
+    defaultMainWith (defaultConfig { timeLimit = 1 })
         [ bgroup "lookup"
             [ bgroup "present"
                 [ bench "IntMap"  $ whnf (\m -> foldl' (\n k -> fromMaybe n (M.lookup k m)) 0 keys) denseM
