@@ -35,6 +35,10 @@ type Offset = Int
 
 pattern N = 16
 
+ptrEq :: a -> a -> Bool
+ptrEq x y = isTrue# (Exts.reallyUnsafePtrEquality# x y Exts.==# 1#)
+{-# INLINE ptrEq #-}
+
 length :: Array a -> Int
 length (Array ary) = I# (Exts.sizeofArray# ary)
 {-# INLINE length #-}
@@ -139,8 +143,8 @@ offset k w = popCount $ w .&. (bit k - 1)
 insert :: Key -> v -> WordMap v -> WordMap v
 insert !k v xs0 = go xs0 where 
   go Nil = Tip k v
-  go ot@(Tip ok _)
-    | k == ok = t
+  go ot@(Tip ok ov)
+    | k == ok = if ptrEq v ov then ot else t
     | o <- level (xor k ok) = Node k o (setBit (mask k o) (maskBit ok o))
          $ if k < ok then two t ot else two ot t
     where t = Tip k v
@@ -149,15 +153,16 @@ insert !k v xs0 = go xs0 where
     = if
       | o > n -> Node k o (setBit (mask k o) (maskBit ok o))
                $ if k < ok then two (Tip k v) on else two on (Tip k v)
-      | d <- maskBit k n -> if 
-        | testBit m d -> Node ok n m            (updateArray (offset d m) go as)
-        | otherwise   -> node ok n (setBit m d) (insertArray (offset d m) (Tip k v) as)
+      | d <- maskBit k n, odm <- offset d m -> if 
+        | testBit m d, !oz <- indexArray as odm, !z <- go oz -> if ptrEq z oz then on else Node ok n m (updateArray odm z as)
+        | otherwise   -> node ok n (setBit m d) (insertArray odm (Tip k v) as)
   go on@(Full ok n as)
     | o <- level (xor k ok)
     = if 
       | o > n -> Node k o (setBit (mask k o) (maskBit ok o))
                $ if k < ok then two (Tip k v) on else two on (Tip k v)
-      | otherwise -> Full ok n (updateArray (maskBit k n) go as)
+      | d   <- maskBit k n, !oz <- indexArray as d, !z  <- go oz, not (ptrEq z oz) -> Full ok n (update16 d z as)
+      | otherwise        -> on
       
 {-# INLINE insert #-}
 
@@ -181,21 +186,25 @@ member !k xs0 = go xs0 where
   go (Full _ o a) = go (indexArray a (maskBit k o))
 {-# INLINE member #-}
   
-updateArray :: Int -> (a -> a) -> Array a -> Array a
-updateArray !k f i = runST $ do
+updateArray :: Int -> a -> Array a -> Array a
+updateArray !k a i = runST $ do
   let n = length i
   o <- newArray n undefined
   copyArray o 0 i 0 n
-  a <- indexArrayM i k 
-  writeArray o k (f a)
+  writeArray o k a
+  unsafeFreezeArray o
+
+update16 :: Int -> a -> Array a -> Array a
+update16 !k a i = runST $ do
+  o <- clone16 i
+  writeArray o k a
   unsafeFreezeArray o
 
 insertArray :: Int -> a -> Array a -> Array a
 insertArray !k a i = runST $ do
   let n = length i
-  o <- newArray (n + 1) undefined
+  o <- newArray (n + 1) a
   copyArray  o 0 i 0 k 
-  writeArray o k a
   copyArray  o (k+1) i k (n-k)
   unsafeFreezeArray o
 
@@ -204,6 +213,28 @@ two a b = runST $ do
   arr <- newArray 2 b
   writeArray arr 0 a
   unsafeFreezeArray arr
+
+clone16 :: Array a -> ST s (MutableArray s a)
+clone16 i = do
+  o <- newArray 16 undefined
+  indexArrayM i 0 >>= writeArray o 0
+  indexArrayM i 1 >>= writeArray o 1
+  indexArrayM i 2 >>= writeArray o 2
+  indexArrayM i 3 >>= writeArray o 3
+  indexArrayM i 4 >>= writeArray o 4
+  indexArrayM i 5 >>= writeArray o 5
+  indexArrayM i 6 >>= writeArray o 6
+  indexArrayM i 7 >>= writeArray o 7
+  indexArrayM i 8 >>= writeArray o 8
+  indexArrayM i 9 >>= writeArray o 9
+  indexArrayM i 10 >>= writeArray o 10
+  indexArrayM i 11 >>= writeArray o 11
+  indexArrayM i 12 >>= writeArray o 12
+  indexArrayM i 13 >>= writeArray o 13
+  indexArrayM i 14 >>= writeArray o 14
+  indexArrayM i 15 >>= writeArray o 15
+  return o
+
 
 -- so we need to be able to quickly check if we differ on a higher nybble than the one
 -- the word32s are the least and greatest keys possible in this node, not present
