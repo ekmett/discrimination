@@ -57,8 +57,8 @@ ptrEq x y = isTrue# (Exts.reallyUnsafePtrEquality# x y Exts.==# 1#)
 {-# INLINEABLE ptrEq #-}
 
 data WordMap v
-  = Node !Key !Offset !Mask !(SmallArray (WordMap v))
-  | Full !Key !Offset !(SmallArray (WordMap v))
+  = Full !Key !Offset !(SmallArray (WordMap v))
+  | Node !Key !Offset !Mask !(SmallArray (WordMap v))
   | Tip  !Key v
   | Nil
   deriving Show
@@ -69,33 +69,33 @@ node k o m a      = Node k o m a
 {-# INLINE node #-}
 
 instance NFData v => NFData (WordMap v) where
-  rnf Nil = ()
-  rnf (Tip _ v) = rnf v
-  rnf (Node _ _ _ a) = rnf a
   rnf (Full _ _ a)   = rnf a
+  rnf (Node _ _ _ a) = rnf a
+  rnf (Tip _ v) = rnf v
+  rnf Nil = ()
 
 instance Functor WordMap where
   fmap f = go where
-    go Nil = Nil
-    go (Tip k v) = Tip k (f v)
-    go (Node k o m a) = Node k o m (fmap go a)
     go (Full k o a) = Full k o (fmap go a)
+    go (Node k o m a) = Node k o m (fmap go a)
+    go (Tip k v) = Tip k (f v)
+    go Nil = Nil
   {-# INLINEABLE fmap #-}
 
 instance Foldable WordMap where
   foldMap f = go where
-    go Nil = mempty
-    go (Tip _ v) = f v
-    go (Node _ _ _ a) = foldMap go a
     go (Full _ _ a) = foldMap go a
+    go (Node _ _ _ a) = foldMap go a
+    go (Tip _ v) = f v
+    go Nil = mempty
   {-# INLINEABLE foldMap #-}
 
 instance Traversable WordMap where
   traverse f = go where
-    go Nil = pure Nil
-    go (Tip k v) = Tip k <$> f v
-    go (Node k o m a) = Node k o m <$> traverse go a
     go (Full k o a) = Full k o <$> traverse go a
+    go (Node k o m a) = Node k o m <$> traverse go a
+    go (Tip k v) = Tip k <$> f v
+    go Nil = pure Nil
   {-# INLINEABLE traverse #-}
 
 -- Note: 'level 0' will return a negative shift, don't use it
@@ -118,11 +118,6 @@ offset k w = popCount $ w .&. (unsafeShiftL 1 k - 1)
 insert :: Key -> v -> WordMap v -> WordMap v
 insert !k v xs0 = go xs0 where
   make o ok on = Node k o (setBit (mask k o) (maskBit ok o)) $ if k < ok then two (Tip k v) on else two on (Tip k v)
-  go Nil = Tip k v
-  go on@(Tip ok ov)
-    | k /= ok, o <- level (xor k ok) = make o ok on
-    | ptrEq v ov = on
-    | otherwise  = Tip k v
   go on@(Full ok n as)
     | o <- level (xor k ok), o > n = make o ok on
     | d <- maskBit k n, !oz <- indexSmallArray as d, !z  <- go oz, not (ptrEq z oz) = Full ok n (update16 d z as)
@@ -136,6 +131,11 @@ insert !k v xs0 = go xs0 where
       o = level (xor k ok)
       d = maskBit k n
       odm = offset d m
+  go on@(Tip ok ov)
+    | k /= ok, o <- level (xor k ok) = make o ok on
+    | ptrEq v ov = on
+    | otherwise  = Tip k v
+  go Nil = Tip k v
 {-# INLINEABLE insert #-}
 
 lookup :: Key -> WordMap v -> Maybe v
