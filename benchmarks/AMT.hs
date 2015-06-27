@@ -1,17 +1,19 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
-{-# OPTIONS_GHC -Wall -funbox-strict-fields -fno-warn-orphans -fno-warn-type-defaults -O2 #-}
+{-# OPTIONS_GHC -Wall -funbox-strict-fields -fno-warn-orphans -fno-warn-type-defaults -fno-full-laziness -O2 #-}
 module Main where
 
 import Control.Applicative
 import Control.DeepSeq
 import Control.Exception (evaluate)
-import Control.Monad.ST
+import Control.Monad.ST hiding (runST)
 import Criterion.Main
 import Criterion.Types
 import Data.Bits
@@ -29,6 +31,21 @@ import qualified Prelude
 import qualified Data.IntMap as M
 import qualified Data.HashMap.Strict as H
 import GHC.Types
+import GHC.Base (realWorld#)
+import GHC.ST hiding (runST, runSTRep)
+
+-- | Return the value computed by a state transformer computation.
+-- The @forall@ ensures that the internal state used by the 'ST'
+-- computation is inaccessible to the rest of the program.
+runST :: (forall s. ST s a) -> a
+runST st = runSTRep (case st of { ST st_rep -> st_rep })
+{-# INLINE runST #-}
+
+runSTRep :: (forall s. STRep s a) -> a
+runSTRep st_rep = case st_rep realWorld# of
+                        (# _, r #) -> r
+{-# INLINE [0] runSTRep #-}
+
 
 type Key = Word64
 type Mask = Word16

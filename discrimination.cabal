@@ -59,7 +59,7 @@ library
 benchmark wordmap
   type:           exitcode-stdio-1.0
   main-is:        AMT.hs
-  ghc-options:    -Wall -O2 -threaded -funbox-strict-fields
+  ghc-options:    -Wall -O2 -threaded
   hs-source-dirs: benchmarks
   build-depends:
     base,
