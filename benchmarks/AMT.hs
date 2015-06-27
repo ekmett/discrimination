@@ -69,6 +69,10 @@ ptrEq :: a -> a -> Bool
 ptrEq x y = isTrue# (Exts.reallyUnsafePtrEquality# x y Exts.==# 1#)
 {-# INLINEABLE ptrEq #-}
 
+ptrNeq :: a -> a -> Bool
+ptrNeq x y = isTrue# (Exts.reallyUnsafePtrEquality# x y Exts./=# 1#)
+{-# INLINEABLE ptrNeq #-}
+
 data WordMap v
   = Full !Key !Offset !(SmallArray (WordMap v))
   | Node !Key !Offset !Mask !(SmallArray (WordMap v))
@@ -133,12 +137,12 @@ insert !k v xs0 = go xs0 where
   pair o ok on = Node k o (mask k o .|. mask ok o) $ if k < ok then two (Tip k v) on else two on (Tip k v)
   go on@(Full ok n as)
     | o <- level (xor k ok), o > n = pair o ok on
-    | d <- maskBit k n, !oz <- indexSmallArray as d, !z <- go oz, not (ptrEq z oz) = Full ok n (update16 d z as)
+    | d <- maskBit k n, !oz <- indexSmallArray as d, !z <- go oz, ptrNeq z oz = Full ok n (update16 d z as)
     | otherwise = on
   go on@(Node ok n m as)
     | o <- level (xor k ok), o > n = pair o ok on
     | m .&. b == 0 = node ok n (m .|. b) (insertSmallArray odm (Tip k v) as)
-    | !oz <- indexSmallArray as odm, !z <- go oz, not (ptrEq z oz) = Node ok n m (updateSmallArray odm z as)
+    | !oz <- indexSmallArray as odm, !z <- go oz, ptrNeq z oz = Node ok n m (updateSmallArray odm z as)
     | otherwise = on
     where
       d = fromIntegral (unsafeShiftR k n .&. 0xf)
