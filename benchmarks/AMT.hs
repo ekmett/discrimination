@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
@@ -36,8 +37,7 @@ pattern N = 16
 
 ptrEq :: a -> a -> Bool
 ptrEq x y = isTrue# (Exts.reallyUnsafePtrEquality# x y Exts.==# 1#)
-{-# INLINE ptrEq #-}
-
+{-# INLINEABLE ptrEq #-}
 
 instance Exts.IsList (Array a) where
   type Item (Array a) = a
@@ -103,7 +103,7 @@ instance Functor WordMap where
     go (Tip k v) = Tip k (f v)
     go (Node k o m a) = Node k o m (fmap go a)
     go (Full k o a) = Full k o (fmap go a)
-  {-# INLINE fmap #-}
+  {-# INLINEABLE fmap #-}
 
 instance Foldable WordMap where
   foldMap f = go where
@@ -111,7 +111,7 @@ instance Foldable WordMap where
     go (Tip _ v) = f v
     go (Node _ _ _ a) = foldMap go a
     go (Full _ _ a) = foldMap go a
-  {-# INLINE foldMap #-}
+  {-# INLINEABLE foldMap #-}
 
 instance Traversable WordMap where
   traverse f = go where
@@ -119,7 +119,7 @@ instance Traversable WordMap where
     go (Tip k v) = Tip k <$> f v
     go (Node k o m a) = Node k o m <$> traverse go a
     go (Full k o a) = Full k o <$> traverse go a
-  {-# INLINE traverse #-}
+  {-# INLINEABLE traverse #-}
 
 -- Note: 'level 0' will return a negative shift, don't use it
 level :: Key -> Int
@@ -159,7 +159,7 @@ insert !k v xs0 = go xs0 where
       o = level (xor k ok)
       d = maskBit k n
       odm = offset d m
-{-# INLINE insert #-}
+{-# INLINEABLE insert #-}
 
 lookup :: Key -> WordMap v -> Maybe v
 lookup !k xs0 = go xs0 where
@@ -171,7 +171,7 @@ lookup !k xs0 = go xs0 where
     | d <- maskBit k o, testBit m d = go $ indexArray a (offset d m)
     | otherwise = Nothing
   go (Full _ o a) = go $ indexArray a (maskBit k o)
-{-# INLINE lookup #-}
+{-# INLINEABLE lookup #-}
 
 member :: Key -> WordMap v -> Bool
 member !k xs0 = go xs0 where
@@ -179,7 +179,7 @@ member !k xs0 = go xs0 where
   go (Tip ok _) = k == ok
   go (Node _ o m a) | d <- maskBit k o = testBit m d && go (indexArray a (offset d m))
   go (Full _ o a) = go (indexArray a (maskBit k o))
-{-# INLINE member #-}
+{-# INLINEABLE member #-}
   
 updateArray :: Int -> a -> Array a -> Array a
 updateArray !k a i = runST $ do
@@ -188,12 +188,14 @@ updateArray !k a i = runST $ do
   copyArray o 0 i 0 n
   writeArray o k a
   unsafeFreezeArray o
+{-# INLINEABLE updateArray #-}
 
 update16 :: Int -> a -> Array a -> Array a
 update16 !k a i = runST $ do
   o <- clone16 i
   writeArray o k a
   unsafeFreezeArray o
+{-# INLINEABLE update16 #-}
 
 insertArray :: Int -> a -> Array a -> Array a
 insertArray !k a i = runST $ do
@@ -202,12 +204,14 @@ insertArray !k a i = runST $ do
   copyArray  o 0 i 0 k 
   copyArray  o (k+1) i k (n-k)
   unsafeFreezeArray o
+{-# INLINEABLE insertArray #-}
 
 two :: a -> a -> Array a
 two a b = runST $ do
   arr <- newArray 2 b
   writeArray arr 0 a
   unsafeFreezeArray arr
+{-# INLINE two #-}
 
 clone16 :: Array a -> ST s (MutableArray s a)
 clone16 i = do
@@ -229,16 +233,18 @@ clone16 i = do
   indexArrayM i 14 >>= writeArray o 14
   indexArrayM i 15 >>= writeArray o 15
   return o
-
+{-# INLINE clone16 #-}
 
 -- so we need to be able to quickly check if we differ on a higher nybble than the one
 -- the word32s are the least and greatest keys possible in this node, not present
 
 singleton :: Key -> v -> WordMap v
 singleton !k v = Tip k v
+{-# INLINE singleton #-}
 
 fromList :: [(Word64,v)] -> WordMap v
 fromList xs = foldl' (\r (k,v) -> insert k v r) Nil xs
+{-# INLINE fromList #-}
 
 main :: IO ()
 main = do

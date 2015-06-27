@@ -55,3 +55,17 @@ library
     transformers  >= 0.2    && < 0.5,
     vector        >= 0.10   && < 0.11,
     void          >= 0.5    && < 1
+
+benchmark wordmap
+  type:           exitcode-stdio-1.0
+  main-is:        AMT.hs
+  ghc-options:    -Wall -O2 -threaded -funbox-strict-fields
+  hs-source-dirs: benchmarks
+  build-depends:
+    base,
+    containers,
+    criterion,
+    deepseq,
+    ghc-prim,
+    unordered-containers,
+    primitive
