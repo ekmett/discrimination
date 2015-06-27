@@ -235,7 +235,7 @@ groupingEq a b = runST $ do
   k a ()
   k b ()
   n <- readMutVar rn
-  return $ n == 2
+  return $ n == 1
 {-# INLINE groupingEq #-}
 
 runGroup :: Group a -> [(a,b)] -> [[b]]
