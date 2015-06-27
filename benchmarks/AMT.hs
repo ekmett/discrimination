@@ -138,22 +138,26 @@ insert !k v xs0 = go xs0 where
 {-# INLINEABLE insert #-}
 
 lookup :: Key -> WordMap v -> Maybe v
-lookup !k xs0 = go xs0 where
-  go Nil = Nothing
-  go (Tip ok ov)
-    | k == ok   = Just ov
+lookup !_ Nil = Nothing
+lookup k (Tip ok ov)
+  | k == ok   = Just ov
+  | otherwise = Nothing
+lookup k (Node _ o m a) | b <- mask k o, m .&. b /= 0 = lookup k $ indexSmallArray a (popCount (m .&. (b - 1)))
+  | otherwise = Nothing
+{-
+lookup k (Node _ o m a)
+    | d <- maskBit k o, testBit m d = lookup k $ indexSmallArray a (offset d m)
     | otherwise = Nothing
-  go (Node _ o m a)
-    | d <- maskBit k o, testBit m d = go $ indexSmallArray a (offset d m)
-    | otherwise = Nothing
-  go (Full _ o a) = go $ indexSmallArray a (maskBit k o)
+-}
+lookup k (Full _ o a) = lookup k $ indexSmallArray a (maskBit k o)
 {-# INLINEABLE lookup #-}
 
 member :: Key -> WordMap v -> Bool
 member !k xs0 = go xs0 where
   go Nil = False
   go (Tip ok _) = k == ok
-  go (Node _ o m a) | d <- maskBit k o = testBit m d && go (indexSmallArray a (offset d m))
+  -- go (Node _ o m a) | d <- maskBit k o, testBit m d && go (indexSmallArray a (offset d m))
+  go (Node _ o m a) | b <- mask k o = m .&. b /= 0 && go (indexSmallArray a (popCount (m .&. (b - 1))))
   go (Full _ o a) = go (indexSmallArray a (maskBit k o))
 {-# INLINEABLE member #-}
   
