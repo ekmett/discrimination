@@ -22,17 +22,17 @@ import Data.Functor
 import Data.HashMap.Lazy (HashMap)
 import Data.Maybe (fromMaybe)
 import Data.Monoid
-import Data.Primitive.Array
+-- import Data.Primitive.Array
 import Data.Traversable
 import Data.Word
 import qualified GHC.Exts as Exts
 import Prelude hiding (lookup, length, foldr)
-import qualified Prelude
 import qualified Data.IntMap as M
 import qualified Data.HashMap.Lazy as H
 import GHC.Types
 import GHC.Base (realWorld#)
 import GHC.ST hiding (runST, runSTRep)
+import SmallArray
 
 -- | Return the value computed by a state transformer computation.
 -- The @forall@ ensures that the internal state used by the 'ST'
@@ -46,7 +46,6 @@ runSTRep st_rep = case st_rep realWorld# of
                         (# _, r #) -> r
 {-# INLINE [0] runSTRep #-}
 
-
 type Key = Word64
 type Mask = Word16
 type Offset = Int
@@ -57,62 +56,14 @@ ptrEq :: a -> a -> Bool
 ptrEq x y = isTrue# (Exts.reallyUnsafePtrEquality# x y Exts.==# 1#)
 {-# INLINEABLE ptrEq #-}
 
-instance Exts.IsList (Array a) where
-  type Item (Array a) = a
-  toList !arr = go 0 where
-    n = length arr
-    go !k
-      | k == n    = []
-      | otherwise = indexArray arr k : go (k+1)
-  fromListN n xs0 = runST $ do
-    arr <- newArray n undefined
-    let go !_ []     = return ()
-        go k (x:xs) = writeArray arr k x >> go (k+1) xs
-    go 0 xs0
-    unsafeFreezeArray arr
-  fromList xs = Exts.fromListN (Prelude.length xs) xs
-
-instance Functor Array where
-  fmap f !i = runST $ do
-    let n = length i
-    o <- newArray n undefined
-    let go !k 
-          | k == n = return ()
-          | otherwise = do
-            a <- indexArrayM i k 
-            writeArray o k (f a)
-            go (k+1)
-    go 0
-    unsafeFreezeArray o
-
-instance Foldable Array where
-  foldr f z a = foldr f z (Exts.toList a)
-  foldMap f a = foldMap f (Exts.toList a)
-  length (Array ary) = I# (Exts.sizeofArray# ary)
-  {-# INLINE length #-}
-
-instance Traversable Array where
-  traverse f a = Exts.fromListN (length a) <$> traverse f (Exts.toList a)
-
-instance Show a => Show (Array a) where
-  showsPrec d as = showParen (d > 10) $
-    showString "fromListN " . showsPrec 11 (length as) . showChar ' ' . showsPrec 11 (Exts.toList as)
-  
-instance NFData a => NFData (Array a) where
-  rnf a0 = go a0 (length a0) 0 where
-    go !a !n !i
-      | i >= n = ()
-      | otherwise = rnf (indexArray a i) `seq` go a n (i+1)
-  {-# INLINE rnf #-}
-
 data WordMap v
   = Nil
   | Tip  !Key v
-  | Node !Key !Offset !Mask !(Array (WordMap v))
-  | Full !Key !Offset !(Array (WordMap v))
+  | Node !Key !Offset !Mask !(SmallArray (WordMap v))
+  | Full !Key !Offset !(SmallArray (WordMap v))
   deriving Show
 
-node :: Key -> Offset -> Mask -> Array (WordMap v) -> WordMap v
+node :: Key -> Offset -> Mask -> SmallArray (WordMap v) -> WordMap v
 node k o 0xffff a = Full k o a
 node k o m a      = Node k o m a
 
@@ -173,12 +124,12 @@ insert !k v xs0 = go xs0 where
     | otherwise  = Tip k v
   go on@(Full ok n as)
     | o <- level (xor k ok), o > n = make o ok on
-    | d <- maskBit k n, !oz <- indexArray as d, !z  <- go oz, not (ptrEq z oz) = Full ok n (update16 d z as)
+    | d <- maskBit k n, !oz <- indexSmallArray as d, !z  <- go oz, not (ptrEq z oz) = Full ok n (update16 d z as)
     | otherwise = on
   go on@(Node ok n m as)
     | o > n = make o ok on
-    | not (testBit m d) = node ok n (setBit m d) (insertArray odm (Tip k v) as)
-    | !oz <- indexArray as odm, !z <- go oz, not (ptrEq z oz) = Node ok n m (updateArray odm z as)
+    | not (testBit m d) = node ok n (setBit m d) (insertSmallArray odm (Tip k v) as)
+    | !oz <- indexSmallArray as odm, !z <- go oz, not (ptrEq z oz) = Node ok n m (updateSmallArray odm z as)
     | otherwise = on
     where 
       o = level (xor k ok)
@@ -193,70 +144,70 @@ lookup !k xs0 = go xs0 where
     | k == ok   = Just ov
     | otherwise = Nothing
   go (Node _ o m a)
-    | d <- maskBit k o, testBit m d = go $ indexArray a (offset d m)
+    | d <- maskBit k o, testBit m d = go $ indexSmallArray a (offset d m)
     | otherwise = Nothing
-  go (Full _ o a) = go $ indexArray a (maskBit k o)
+  go (Full _ o a) = go $ indexSmallArray a (maskBit k o)
 {-# INLINEABLE lookup #-}
 
 member :: Key -> WordMap v -> Bool
 member !k xs0 = go xs0 where
   go Nil = False
   go (Tip ok _) = k == ok
-  go (Node _ o m a) | d <- maskBit k o = testBit m d && go (indexArray a (offset d m))
-  go (Full _ o a) = go (indexArray a (maskBit k o))
+  go (Node _ o m a) | d <- maskBit k o = testBit m d && go (indexSmallArray a (offset d m))
+  go (Full _ o a) = go (indexSmallArray a (maskBit k o))
 {-# INLINEABLE member #-}
   
-updateArray :: Int -> a -> Array a -> Array a
-updateArray !k a i = runST $ do
+updateSmallArray :: Int -> a -> SmallArray a -> SmallArray a
+updateSmallArray !k a i = runST $ do
   let n = length i
-  o <- newArray n undefined
-  copyArray o 0 i 0 n
-  writeArray o k a
-  unsafeFreezeArray o
-{-# INLINEABLE updateArray #-}
+  o <- newSmallArray n undefined
+  copySmallArray o 0 i 0 n
+  writeSmallArray o k a
+  unsafeFreezeSmallArray o
+{-# INLINEABLE updateSmallArray #-}
 
-update16 :: Int -> a -> Array a -> Array a
+update16 :: Int -> a -> SmallArray a -> SmallArray a
 update16 !k a i = runST $ do
   o <- clone16 i
-  writeArray o k a
-  unsafeFreezeArray o
+  writeSmallArray o k a
+  unsafeFreezeSmallArray o
 {-# INLINEABLE update16 #-}
 
-insertArray :: Int -> a -> Array a -> Array a
-insertArray !k a i = runST $ do
+insertSmallArray :: Int -> a -> SmallArray a -> SmallArray a
+insertSmallArray !k a i = runST $ do
   let n = length i
-  o <- newArray (n + 1) a
-  copyArray  o 0 i 0 k 
-  copyArray  o (k+1) i k (n-k)
-  unsafeFreezeArray o
-{-# INLINEABLE insertArray #-}
+  o <- newSmallArray (n + 1) a
+  copySmallArray  o 0 i 0 k 
+  copySmallArray  o (k+1) i k (n-k)
+  unsafeFreezeSmallArray o
+{-# INLINEABLE insertSmallArray #-}
 
-two :: a -> a -> Array a
+two :: a -> a -> SmallArray a
 two a b = runST $ do
-  arr <- newArray 2 b
-  writeArray arr 0 a
-  unsafeFreezeArray arr
+  arr <- newSmallArray 2 b
+  writeSmallArray arr 0 a
+  unsafeFreezeSmallArray arr
 {-# INLINE two #-}
 
-clone16 :: Array a -> ST s (MutableArray s a)
+clone16 :: SmallArray a -> ST s (SmallMutableArray s a)
 clone16 i = do
-  o <- newArray 16 undefined
-  indexArrayM i 0 >>= writeArray o 0
-  indexArrayM i 1 >>= writeArray o 1
-  indexArrayM i 2 >>= writeArray o 2
-  indexArrayM i 3 >>= writeArray o 3
-  indexArrayM i 4 >>= writeArray o 4
-  indexArrayM i 5 >>= writeArray o 5
-  indexArrayM i 6 >>= writeArray o 6
-  indexArrayM i 7 >>= writeArray o 7
-  indexArrayM i 8 >>= writeArray o 8
-  indexArrayM i 9 >>= writeArray o 9
-  indexArrayM i 10 >>= writeArray o 10
-  indexArrayM i 11 >>= writeArray o 11
-  indexArrayM i 12 >>= writeArray o 12
-  indexArrayM i 13 >>= writeArray o 13
-  indexArrayM i 14 >>= writeArray o 14
-  indexArrayM i 15 >>= writeArray o 15
+  o <- newSmallArray 16 undefined
+  indexSmallArrayM i 0 >>= writeSmallArray o 0
+  indexSmallArrayM i 1 >>= writeSmallArray o 1
+  indexSmallArrayM i 2 >>= writeSmallArray o 2
+  indexSmallArrayM i 3 >>= writeSmallArray o 3
+  indexSmallArrayM i 4 >>= writeSmallArray o 4
+  indexSmallArrayM i 5 >>= writeSmallArray o 5
+  indexSmallArrayM i 6 >>= writeSmallArray o 6
+  indexSmallArrayM i 7 >>= writeSmallArray o 7
+  indexSmallArrayM i 8 >>= writeSmallArray o 8
+  indexSmallArrayM i 9 >>= writeSmallArray o 9
+  indexSmallArrayM i 10 >>= writeSmallArray o 10
+  indexSmallArrayM i 11 >>= writeSmallArray o 11
+  indexSmallArrayM i 12 >>= writeSmallArray o 12
+  indexSmallArrayM i 13 >>= writeSmallArray o 13
+  indexSmallArrayM i 14 >>= writeSmallArray o 14
+  indexSmallArrayM i 15 >>= writeSmallArray o 15
   return o
 {-# INLINE clone16 #-}
 
