@@ -57,8 +57,8 @@ ptrEq x y = isTrue# (Exts.reallyUnsafePtrEquality# x y Exts.==# 1#)
 {-# INLINEABLE ptrEq #-}
 
 data WordMap v
-  = Full !Key !Offset !(SmallArray (WordMap v))
-  | Node !Key !Offset !Mask !(SmallArray (WordMap v))
+  = Node !Key !Offset !Mask !(SmallArray (WordMap v))
+  | Full !Key !Offset !(SmallArray (WordMap v))
   | Tip  !Key v
   | Nil
   deriving Show
@@ -116,7 +116,7 @@ offset k w = popCount $ w .&. (bit k - 1)
 {-# INLINE offset #-}
 
 insert :: Key -> v -> WordMap v -> WordMap v
-insert !k v xs0 = go xs0 where 
+insert !k v xs0 = go xs0 where
   make o ok on = Node k o (setBit (mask k o) (maskBit ok o)) $ if k < ok then two (Tip k v) on else two on (Tip k v)
   go Nil = Tip k v
   go on@(Tip ok ov)
@@ -132,7 +132,7 @@ insert !k v xs0 = go xs0 where
     | not (testBit m d) = node ok n (setBit m d) (insertSmallArray odm (Tip k v) as)
     | !oz <- indexSmallArray as odm, !z <- go oz, not (ptrEq z oz) = Node ok n m (updateSmallArray odm z as)
     | otherwise = on
-    where 
+    where
       o = level (xor k ok)
       d = maskBit k n
       odm = offset d m
@@ -143,20 +143,23 @@ lookup !_ Nil = Nothing
 lookup k (Tip ok ov)
   | k == ok   = Just ov
   | otherwise = Nothing
-lookup k (Node _ o m a)
-  | m .&. b == 0 = Nothing
-  | otherwise   = lookup k (indexSmallArray a (popCount (m .&. (b - 1))))
-  where b = mask k o 
-lookup k (Full _ o a) = lookup k $ indexSmallArray a (maskBit k o)
+lookup k (Node ok o m a)
+  | unsafeShiftR (xor k ok) o > 0xf || m .&. b == 0 = Nothing
+  | otherwise = lookup k (indexSmallArray a (popCount (m .&. (b - 1))))
+  where b = mask k o
+lookup k (Full ok o a)
+  | unsafeShiftR (xor k ok) o > 0xf = Nothing
+  | otherwise = lookup k $ indexSmallArray a (maskBit k o)
 {-# INLINEABLE lookup #-}
 
 member :: Key -> WordMap v -> Bool
 member !_ Nil = False
 member k (Tip ok _) = k == ok
-member k (Node _ o m a) | b <- mask k o = m .&. b /= 0 && member k (indexSmallArray a (popCount (m .&. (b - 1))))
-member k (Full _ o a) = member k (indexSmallArray a (maskBit k o))
+member k (Node ok o m a) = unsafeShiftR (xor k ok) o <= 0xf && m .&. b /= 0 && member k (indexSmallArray a (popCount (m .&. (b - 1))))
+  where b = mask k o
+member k (Full ok o a) = unsafeShiftR (xor k ok) o <= 0xf && member k (indexSmallArray a (maskBit k o))
 {-# INLINEABLE member #-}
-  
+
 updateSmallArray :: Int -> a -> SmallArray a -> SmallArray a
 updateSmallArray !k a i = runST $ do
   let n = length i
@@ -177,7 +180,7 @@ insertSmallArray :: Int -> a -> SmallArray a -> SmallArray a
 insertSmallArray !k a i = runST $ do
   let n = length i
   o <- newSmallArray (n + 1) a
-  copySmallArray  o 0 i 0 k 
+  copySmallArray  o 0 i 0 k
   copySmallArray  o (k+1) i k (n-k)
   unsafeFreezeSmallArray o
 {-# INLINEABLE insertSmallArray #-}
