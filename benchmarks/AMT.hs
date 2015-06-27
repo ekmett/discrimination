@@ -108,11 +108,11 @@ maskBit k o = fromIntegral (unsafeShiftR k o .&. 0xf)
 {-# INLINE maskBit #-}
 
 mask :: Key -> Offset -> Word16
-mask k o = bit (maskBit k o)
+mask k o = unsafeShiftL 1 (maskBit k o)
 {-# INLINE mask #-}
 
 offset :: Int -> Word16 -> Int
-offset k w = popCount $ w .&. (bit k - 1)
+offset k w = popCount $ w .&. (unsafeShiftL 1 k - 1)
 {-# INLINE offset #-}
 
 insert :: Key -> v -> WordMap v -> WordMap v
@@ -139,17 +139,20 @@ insert !k v xs0 = go xs0 where
 {-# INLINEABLE insert #-}
 
 lookup :: Key -> WordMap v -> Maybe v
-lookup !_ Nil = Nothing
+lookup !k (Full ok o a)
+  | z > 0xf = Nothing
+  | otherwise = lookup k $ indexSmallArray a (fromIntegral z)
+  where z = unsafeShiftR (xor k ok) o
+lookup k (Node ok o m a)
+  | z > 0xf = Nothing
+  | m .&. b == 0 = Nothing
+  | otherwise = lookup k (indexSmallArray a (popCount (m .&. (b - 1))))
+  where z = unsafeShiftR (xor k ok) o
+        b = unsafeShiftL 1 (fromIntegral z)
 lookup k (Tip ok ov)
   | k == ok   = Just ov
   | otherwise = Nothing
-lookup k (Node ok o m a)
-  | unsafeShiftR (xor k ok) o > 0xf || m .&. b == 0 = Nothing
-  | otherwise = lookup k (indexSmallArray a (popCount (m .&. (b - 1))))
-  where b = mask k o
-lookup k (Full ok o a)
-  | unsafeShiftR (xor k ok) o > 0xf = Nothing
-  | otherwise = lookup k $ indexSmallArray a (maskBit k o)
+lookup _ Nil = Nothing
 {-# INLINEABLE lookup #-}
 
 member :: Key -> WordMap v -> Bool
