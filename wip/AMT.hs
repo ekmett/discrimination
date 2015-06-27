@@ -1,6 +1,8 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 {-# OPTIONS_GHC -funbox-strict-fields -O2 #-}
 module Main where
@@ -12,16 +14,20 @@ import Control.Monad.ST
 import Criterion.Main
 import Data.Bits
 import Data.Bits.Extras
-import Data.Foldable hiding (foldl')
+import Data.Foldable
 import Data.Functor
-import Data.List (foldl')
 import Data.Maybe (fromMaybe)
 import Data.Monoid
 import Data.Primitive.Array
 import Data.Traversable
 import Data.Word
-import Prelude hiding (lookup)
+import qualified GHC.Exts as Exts
+import Prelude hiding (lookup, length, foldr)
+import qualified Prelude
 import qualified Data.IntMap as M
+import Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as H
+import GHC.Types
 
 type Key = Word64
 type Mask = Word16
@@ -29,33 +35,45 @@ type Offset = Int
 
 pattern N = 16
 
-fromArray :: Int -> Array a -> [a]
-fromArray !n !arr = go 0 where
-  go !k
-    | k == n    = []
-    | otherwise = indexArray arr k : go (k+1)
+length :: Array a -> Int
+length (Array ary) = I# (Exts.sizeofArray# ary)
+{-# INLINE length #-}
 
-toArray :: Int -> [a] -> Array a
-toArray n xs0 = runST $ do
-  arr <- newArray n undefined
-  let go k []     = return ()
-      go k (x:xs) = writeArray arr k x >> go (k+1) xs
-  go 0 xs0
-  unsafeFreezeArray arr
+instance Exts.IsList (Array a) where
+  type Item (Array a) = a
+  toList !arr = go 0 where
+    n = length arr
+    go !k
+      | k == n    = []
+      | otherwise = indexArray arr k : go (k+1)
+  fromListN n xs0 = runST $ do
+    arr <- newArray n undefined
+    let go k []     = return ()
+        go k (x:xs) = writeArray arr k x >> go (k+1) xs
+    go 0 xs0
+    unsafeFreezeArray arr
+  fromList xs = Exts.fromListN (Prelude.length xs) xs
 
--- Assumes n >= 1
-mapArray :: Int -> (a -> b) -> Array a -> Array b
-mapArray !n f !i = runST $ do
-  o <- newArray n undefined
-  let go k 
-        | k == n = return ()
-        | otherwise = do
-          a <- indexArrayM i k 
-          writeArray o k (f a)
-          go (k+1)
-  go 0
-  unsafeFreezeArray o
+instance Functor Array where
+  fmap f !i = runST $ do
+    let n = length i
+    o <- newArray n undefined
+    let go k 
+          | k == n = return ()
+          | otherwise = do
+            a <- indexArrayM i k 
+            writeArray o k (f a)
+            go (k+1)
+    go 0
+    unsafeFreezeArray o
 
+instance Foldable Array where
+  foldr f z a = foldr f z (Exts.toList a)
+  foldMap f a = foldMap f (Exts.toList a)
+
+instance Traversable Array where
+  traverse f a = Exts.fromListN (length a) <$> traverse f (Exts.toList a)
+  
 data WordMap v
   = Nil
   | Tip  !Key v
@@ -64,7 +82,7 @@ data WordMap v
 instance NFData v => NFData (WordMap v) where
   rnf Nil = ()
   rnf (Tip _ v) = rnf v
-  rnf (Node _ _ m a) = rnf (fromArray (popCount m) a)
+  rnf (Node _ _ _ a) = rnf (Exts.toList a)
 
 instance Show v => Show (WordMap v) where
   showsPrec _ Nil = showString "Nil"
@@ -72,80 +90,94 @@ instance Show v => Show (WordMap v) where
      showString "Tip " . showsPrec 11 k . showChar ' ' . showsPrec 11 v
   showsPrec d (Node k o m as) = showParen (d > 10) $
      showString "Node " . showsPrec 11 k . showChar ' ' . showsPrec 11 o . showChar ' ' . showsPrec 11 m . showChar ' ' . showParen True 
-     (showString "toArray " . showsPrec 11 n . showChar ' ' . showsPrec 11 (fromArray n as))
-     where n = popCount m
+     (showString "fromListN " . showsPrec 11 (length as) . showChar ' ' . showsPrec 11 (Exts.toList as))
 
 instance Functor WordMap where
   fmap f = go where
     go Nil = Nil
     go (Tip k v) = Tip k (f v)
-    go (Node k o m a) = Node k o m (mapArray (popCount m) go a)
+    go (Node k o m a) = Node k o m (fmap go a)
+  {-# INLINE fmap #-}
 
 instance Foldable WordMap where
   foldMap f = go where
     go Nil = mempty
     go (Tip _ v) = f v
-    go (Node _ _ m a) = foldMap go (fromArray (popCount m) a)
+    go (Node _ _ m a) = foldMap go a
+  {-# INLINE foldMap #-}
 
 instance Traversable WordMap where
   traverse f = go where
     go Nil = pure Nil
     go (Tip k v) = Tip k <$> f v
-    go (Node k o m a) = Node k o m . toArray n <$> traverse go (fromArray n a) where n = popCount m 
+    go (Node k o m a) = Node k o m <$> traverse go a
+  {-# INLINE traverse #-}
 
 -- Note: 'level 0' will return a negative shift, don't use it
 level :: Key -> Int
-level w = 60 - (nlz w .&. 0xfc)
+level w = 60 - (nlz w .&. 0x7c)
+{-# INLINE level #-}
 
 maskBit :: Key -> Offset -> Int
 maskBit k o = fromIntegral (unsafeShiftR k o .&. 0xf)
+{-# INLINE maskBit #-}
 
 mask :: Key -> Offset -> Word16
 mask k o = bit (maskBit k o)
+{-# INLINE mask #-}
 
 offset :: Int -> Word16 -> Int
 offset k w = popCount $ w .&. (bit k - 1)
+{-# INLINE offset #-}
 
 insert :: Key -> v -> WordMap v -> WordMap v
-insert k v Nil = Tip k v
-insert k v ot@(Tip ok ov)
-  | k == ok = t
-  | o <- level (xor k ok) = Node k o (setBit (mask k o) (maskBit ok o))
-       $ if k < ok then two t ot else two ot t
-  where t = Tip k v
-insert k v on@(Node ok n m as)
-  | o <- level (xor k ok)
-  = if
-    | o > n -> Node k o (setBit (mask k o) (maskBit ok o))
-             $ if k < ok then two (Tip k v) on else two on (Tip k v)
-    | d <- maskBit k n -> if 
-      | testBit m d -> Node ok n m            (updateArray (offset d m) (popCount m) (insert k v) as)
-      | otherwise   -> Node ok n (setBit m d) (insertArray (offset d m) (popCount m) (Tip k v) as)
+insert !k v xs0 = go xs0 where 
+  go Nil = Tip k v
+  go ot@(Tip ok ov)
+    | k == ok = t
+    | o <- level (xor k ok) = Node k o (setBit (mask k o) (maskBit ok o))
+         $ if k < ok then two t ot else two ot t
+    where t = Tip k v
+  go on@(Node ok n m as)
+    | o <- level (xor k ok)
+    = if
+      | o > n -> Node k o (setBit (mask k o) (maskBit ok o))
+               $ if k < ok then two (Tip k v) on else two on (Tip k v)
+      | d <- maskBit k n -> if 
+        | testBit m d -> Node ok n m            (updateArray (offset d m) (insert k v) as)
+        | otherwise   -> Node ok n (setBit m d) (insertArray (offset d m) (Tip k v) as)
+{-# INLINE insert #-}
 
 lookup :: Key -> WordMap v -> Maybe v
-lookup _ Nil = Nothing
-lookup k (Tip ok ov)
-  | k == ok   = Just ov
-  | otherwise = Nothing
-lookup k (Node ok o m a) 
-  | d <- maskBit k o, testBit m d = lookup k $ indexArray a (offset d m)
-  | otherwise = Nothing
+lookup !k xs0 = go xs0 where
+  go Nil = Nothing
+  go (Tip ok ov)
+    | k == ok   = Just ov
+    | otherwise = Nothing
+  go (Node ok o m a) 
+    | d <- maskBit k o, testBit m d = lookup k $ indexArray a (offset d m)
+    | otherwise = Nothing
+{-# INLINE lookup #-}
 
 member :: Key -> WordMap v -> Bool
-member _ Nil = False
-member k (Tip ok _) = k == ok
-member k (Node ok o m a) | d <- maskBit k o = testBit m d && member k (indexArray a (offset d m))
+member !k xs0 = go xs0 where
+  go Nil = False
+  go (Tip ok _) = k == ok
+  go (Node ok o m a) | d <- maskBit k o = testBit m d && member k (indexArray a (offset d m))
+{-# INLINE member #-}
   
-updateArray :: Int -> Int -> (a -> a) -> Array a -> Array a
-updateArray k n f i = runST $ do
+updateArray :: Int -> (a -> a) -> Array a -> Array a
+updateArray !k f i = runST $ do
+  let n = length i
   o <- newArray n undefined
   copyArray o 0 i 0 n
   a <- indexArrayM i k 
   writeArray o k (f a)
   unsafeFreezeArray o
 
-insertArray :: Int -> Int -> a -> Array a -> Array a
-insertArray k n a i = runST $ do
+insertArray :: Int -> a -> Array a -> Array a
+insertArray !k a i = runST $ do
+  let n = length i
   o <- newArray (n + 1) undefined
   copyArray  o 0 i 0 k 
   writeArray o k a
@@ -154,28 +186,32 @@ insertArray k n a i = runST $ do
 
 two :: a -> a -> Array a
 two a b = runST $ do
-  arr <- newArray 2 a
-  writeArray arr 1 b
+  arr <- newArray 2 b
+  writeArray arr 0 a
   unsafeFreezeArray arr
 
 -- so we need to be able to quickly check if we differ on a higher nybble than the one
 -- the word32s are the least and greatest keys possible in this node, not present
 
 singleton :: Key -> v -> WordMap v
-singleton k v = Tip k v
+singleton !k v = Tip k v
 
 fromList :: [(Word64,v)] -> WordMap v
-fromList = foldl' (\r (k,v) -> insert k v r) Nil 
+fromList xs = foldl' (\r (k,v) -> insert k v r) Nil xs
 
 main = do
     let denseM = M.fromAscList elems :: M.IntMap Int
         denseW = fromList welems :: WordMap Word64
+        denseH = H.fromList welems :: HashMap Word64 Word64
         sparseM = M.fromAscList sElems :: M.IntMap Int
         sparseW = fromList wsElems :: WordMap Word64
+        sparseH = H.fromList wsElems :: HashMap Word64 Word64
         sparseM' = M.fromAscList sElemsSearch :: M.IntMap Int
         sparseW' = fromList wsElemsSearch :: WordMap Word64
+        sparseH' = H.fromList wsElemsSearch :: HashMap Word64 Word64
     evaluate $ rnf [denseM, sparseM, sparseM']
     evaluate $ rnf [denseW, sparseW, sparseW']
+    evaluate $ rnf [denseH, sparseH, sparseH']
     evaluate $ rnf [elems,  sElems,  sElemsSearch]
     evaluate $ rnf [keys,   sKeys,   sKeysSearch]
     evaluate $ rnf [values, sValues]
@@ -187,30 +223,36 @@ main = do
             [ bgroup "present"
                 [ bench "IntMap"  $ whnf (\m -> foldl' (\n k -> fromMaybe n (M.lookup k m)) 0 keys) denseM
                 , bench "WordMap" $ whnf (\m -> foldl' (\n k -> fromMaybe n (lookup k m)) 0 wkeys) denseW
+                , bench "HashMap" $ whnf (\m -> foldl' (\n k -> fromMaybe n (H.lookup k m)) 0 wkeys) denseH
                 ]
             , bgroup "absent"
                 [ bench "IntMap"  $ whnf (\m -> foldl' (\n k -> fromMaybe n (M.lookup k m)) 0 sKeysSearch) sparseM
                 , bench "WordMap" $ whnf (\m -> foldl' (\n k -> fromMaybe n (lookup k m)) 0 wsKeysSearch) sparseW
+                , bench "HashMap" $ whnf (\m -> foldl' (\n k -> fromMaybe n (H.lookup k m)) 0 wsKeysSearch) sparseH
                 ]
             ]
         , bgroup "member"
             [ bgroup "present"
                 [ bench "IntMap"  $ whnf (\m -> foldl' (\n x -> if M.member x m then n + 1 else n) 0 keys) denseM
                 , bench "WordMap" $ whnf (\m -> foldl' (\n x -> if member x m then n + 1 else n) 0 wkeys) denseW
+                , bench "HashMap" $ whnf (\m -> foldl' (\n x -> if H.member x m then n + 1 else n) 0 wkeys) denseH
                 ]
             , bgroup "absent"
                 [ bench "IntMap"  $ whnf (\m -> foldl' (\n x -> if M.member x m then n + 1 else n) 0 sKeysSearch) sparseM
                 , bench "WordMap" $ whnf (\m -> foldl' (\n x -> if member x m then n + 1 else n) 0 wsKeysSearch) sparseW
+                , bench "HashMap" $ whnf (\m -> foldl' (\n x -> if H.member x m then n + 1 else n) 0 wsKeysSearch) sparseH
                 ]
             ]
         , bgroup "insert"
             [ bgroup "present"
                 [ bench "IntMap"  $ whnf (\m -> foldl' (\m (k, v) -> M.insert k v m) m elems) denseM
                 , bench "WordMap" $ whnf (\m -> foldl' (\m (k, v) -> insert k v m) m welems) denseW
+                , bench "HashMap" $ whnf (\m -> foldl' (\m (k, v) -> H.insert k v m) m welems) denseH
                 ]
             , bgroup "absent"
                 [ bench "IntMap" $ whnf (\m -> foldl' (\m (k, v) -> M.insert k v m) m sElemsSearch) sparseM
                 , bench "WordMap" $ whnf (\m -> foldl' (\m (k, v) -> insert k v m) m wsElemsSearch) sparseW
+                , bench "HashMap" $ whnf (\m -> foldl' (\m (k, v) -> H.insert k v m) m wsElemsSearch) sparseH
                 ]
             ]
         ]
