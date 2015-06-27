@@ -19,7 +19,7 @@ import Criterion.Types
 import Data.Bits
 import Data.Foldable
 import Data.Functor
-import Data.HashMap.Strict (HashMap)
+import Data.HashMap.Lazy (HashMap)
 import Data.Maybe (fromMaybe)
 import Data.Monoid
 import Data.Primitive.Array
@@ -29,7 +29,7 @@ import qualified GHC.Exts as Exts
 import Prelude hiding (lookup, length, foldr)
 import qualified Prelude
 import qualified Data.IntMap as M
-import qualified Data.HashMap.Strict as H
+import qualified Data.HashMap.Lazy as H
 import GHC.Types
 import GHC.Base (realWorld#)
 import GHC.ST hiding (runST, runSTRep)
