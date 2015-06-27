@@ -140,15 +140,14 @@ insert !k v xs0 = go xs0 where
 
 lookup :: Key -> WordMap v -> Maybe v
 lookup !k (Full ok o a)
-  | z > 0xf = Nothing
-  | otherwise = lookup k $ indexSmallArray a (fromIntegral z)
-  where z = unsafeShiftR (xor k ok) o
+  | z <- unsafeShiftR (xor k ok) o, z <= 0xf = lookup k $ indexSmallArray a (fromIntegral z)
+  | otherwise = Nothing
 lookup k (Node ok o m a)
-  | z > 0xf = Nothing
-  | m .&. b == 0 = Nothing
-  | otherwise = lookup k (indexSmallArray a (popCount (m .&. (b - 1))))
-  where z = unsafeShiftR (xor k ok) o
-        b = unsafeShiftL 1 (fromIntegral z)
+  | z <= 0xf && m .&. b /= 0 = lookup k (indexSmallArray a (popCount (m .&. (b - 1))))
+  | otherwise = Nothing
+  where
+    z = unsafeShiftR (xor k ok) o
+    b = unsafeShiftL 1 (fromIntegral z)
 lookup k (Tip ok ov)
   | k == ok   = Just ov
   | otherwise = Nothing
@@ -156,11 +155,14 @@ lookup _ Nil = Nothing
 {-# INLINEABLE lookup #-}
 
 member :: Key -> WordMap v -> Bool
-member !_ Nil = False
+member !k (Full ok o a)
+  | z <- unsafeShiftR (xor k ok) o = z <= 0xf && member k (indexSmallArray a (fromIntegral z))
+member k (Node ok o m a)
+  | z <- unsafeShiftR (xor k ok) o
+  = z <= 0xf && let b = unsafeShiftL 1 (fromIntegral z) in
+    m .&. b /= 0 && member k (indexSmallArray a (popCount (m .&. (b - 1))))
 member k (Tip ok _) = k == ok
-member k (Node ok o m a) = unsafeShiftR (xor k ok) o <= 0xf && m .&. b /= 0 && member k (indexSmallArray a (popCount (m .&. (b - 1))))
-  where b = mask k o
-member k (Full ok o a) = unsafeShiftR (xor k ok) o <= 0xf && member k (indexSmallArray a (maskBit k o))
+member _ Nil = False
 {-# INLINEABLE member #-}
 
 updateSmallArray :: Int -> a -> SmallArray a -> SmallArray a
