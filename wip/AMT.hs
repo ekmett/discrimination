@@ -73,12 +73,17 @@ instance Foldable Array where
 
 instance Traversable Array where
   traverse f a = Exts.fromListN (length a) <$> traverse f (Exts.toList a)
+
+instance Show a => Show (Array a) where
+  showsPrec d as = showParen (d > 10) $
+    showString "fromListN " . showsPrec 11 (length as) . showChar ' ' . showsPrec 11 (Exts.toList as)
   
 data WordMap v
   = Nil
   | Tip  !Key v
   | Node !Key !Offset !Mask !(Array (WordMap v))
   | Full !Key !Offset !(Array (WordMap v))
+  deriving Show
 
 node :: Key -> Offset -> Mask -> Array (WordMap v) -> WordMap v
 node k o 0xffff a = Full k o a
@@ -89,17 +94,6 @@ instance NFData v => NFData (WordMap v) where
   rnf (Tip _ v) = rnf v
   rnf (Node _ _ _ a) = rnf (Exts.toList a)
   rnf (Full _ _ a) = rnf (Exts.toList a)
-
-instance Show v => Show (WordMap v) where
-  showsPrec _ Nil = showString "Nil"
-  showsPrec d (Tip k v) = showParen (d > 10) $
-     showString "Tip " . showsPrec 11 k . showChar ' ' . showsPrec 11 v
-  showsPrec d (Node k o m as) = showParen (d > 10) $
-     showString "Node " . showsPrec 11 k . showChar ' ' . showsPrec 11 o . showChar ' ' . showsPrec 11 m . showChar ' ' . showParen True 
-     (showString "fromListN " . showsPrec 11 (length as) . showChar ' ' . showsPrec 11 (Exts.toList as))
-  showsPrec d (Full k o as) = showParen (d > 10) $
-     showString "Full " . showsPrec 11 k . showChar ' ' . showsPrec 11 o . showChar ' ' . showParen True 
-     (showString "fromListN " . showsPrec 11 (length as) . showChar ' ' . showsPrec 11 (Exts.toList as))
 
 instance Functor WordMap where
   fmap f = go where
