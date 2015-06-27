@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE MagicHash #-}
@@ -7,7 +8,10 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
-{-# OPTIONS_GHC -Wall -funbox-strict-fields -fno-warn-orphans -fno-warn-type-defaults -fno-full-laziness -O2 #-}
+{-# OPTIONS_GHC -Wall -funbox-strict-fields -fno-warn-orphans -fno-warn-type-defaults -O2 #-}
+#ifdef ST_HACK
+{-# OPTIONS_GHC -fno-full-laziness #-}
+#endif
 module Main where
 
 import Control.Applicative
@@ -31,8 +35,15 @@ import qualified Data.IntMap as M
 import qualified Data.HashMap.Lazy as H
 import GHC.Types
 import GHC.Base (realWorld#)
-import GHC.ST hiding (runST, runSTRep)
 import SmallArray
+
+#ifndef ST_HACK
+
+import GHC.ST
+
+#else
+
+import GHC.ST hiding (runST, runSTRep)
 
 -- | Return the value computed by a state transformer computation.
 -- The @forall@ ensures that the internal state used by the 'ST'
@@ -45,6 +56,8 @@ runSTRep :: (forall s. STRep s a) -> a
 runSTRep st_rep = case st_rep realWorld# of
                         (# _, r #) -> r
 {-# INLINE [0] runSTRep #-}
+
+#endif
 
 type Key = Word64
 type Mask = Word16
