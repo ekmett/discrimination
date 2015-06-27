@@ -78,11 +78,13 @@ data WordMap v
   = Nil
   | Tip  !Key v
   | Node !Key !Offset !Mask !(Array (WordMap v))
+  | Full !Key !Offset !(Array (WordMap v))
 
 instance NFData v => NFData (WordMap v) where
   rnf Nil = ()
   rnf (Tip _ v) = rnf v
   rnf (Node _ _ _ a) = rnf (Exts.toList a)
+  rnf (Full _ _ a) = rnf (Exts.toList a)
 
 instance Show v => Show (WordMap v) where
   showsPrec _ Nil = showString "Nil"
@@ -91,19 +93,24 @@ instance Show v => Show (WordMap v) where
   showsPrec d (Node k o m as) = showParen (d > 10) $
      showString "Node " . showsPrec 11 k . showChar ' ' . showsPrec 11 o . showChar ' ' . showsPrec 11 m . showChar ' ' . showParen True 
      (showString "fromListN " . showsPrec 11 (length as) . showChar ' ' . showsPrec 11 (Exts.toList as))
+  showsPrec d (Full k o as) = showParen (d > 10) $
+     showString "Full " . showsPrec 11 k . showChar ' ' . showsPrec 11 o . showChar ' ' . showParen True 
+     (showString "fromListN " . showsPrec 11 (length as) . showChar ' ' . showsPrec 11 (Exts.toList as))
 
 instance Functor WordMap where
   fmap f = go where
     go Nil = Nil
     go (Tip k v) = Tip k (f v)
     go (Node k o m a) = Node k o m (fmap go a)
+    go (Full k o a) = Full k o (fmap go a)
   {-# INLINE fmap #-}
 
 instance Foldable WordMap where
   foldMap f = go where
     go Nil = mempty
     go (Tip _ v) = f v
-    go (Node _ _ m a) = foldMap go a
+    go (Node _ _ _ a) = foldMap go a
+    go (Full _ _ a) = foldMap go a
   {-# INLINE foldMap #-}
 
 instance Traversable WordMap where
@@ -111,6 +118,7 @@ instance Traversable WordMap where
     go Nil = pure Nil
     go (Tip k v) = Tip k <$> f v
     go (Node k o m a) = Node k o m <$> traverse go a
+    go (Full k o a) = Full k o <$> traverse go a
   {-# INLINE traverse #-}
 
 -- Note: 'level 0' will return a negative shift, don't use it
@@ -146,6 +154,13 @@ insert !k v xs0 = go xs0 where
       | d <- maskBit k n -> if 
         | testBit m d -> Node ok n m            (updateArray (offset d m) (insert k v) as)
         | otherwise   -> Node ok n (setBit m d) (insertArray (offset d m) (Tip k v) as)
+  go on@(Full ok n as)
+    | o <- level (xor k ok)
+    = if 
+      | o > n -> Node k o (setBit (mask k o) (maskBit ok o))
+               $ if k < ok then two (Tip k v) on else two on (Tip k v)
+      | otherwise -> Full ok n (updateArray (maskBit k n) (insert k v) as)
+      
 {-# INLINE insert #-}
 
 lookup :: Key -> WordMap v -> Maybe v
@@ -157,6 +172,7 @@ lookup !k xs0 = go xs0 where
   go (Node ok o m a) 
     | d <- maskBit k o, testBit m d = lookup k $ indexArray a (offset d m)
     | otherwise = Nothing
+  go (Full ok o a) = lookup k (indexArray a (maskBit k o))
 {-# INLINE lookup #-}
 
 member :: Key -> WordMap v -> Bool
@@ -164,6 +180,7 @@ member !k xs0 = go xs0 where
   go Nil = False
   go (Tip ok _) = k == ok
   go (Node ok o m a) | d <- maskBit k o = testBit m d && member k (indexArray a (offset d m))
+  go (Full ok o a) = member k (indexArray a (maskBit k o))
 {-# INLINE member #-}
   
 updateArray :: Int -> (a -> a) -> Array a -> Array a
