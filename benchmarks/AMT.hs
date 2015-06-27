@@ -57,15 +57,16 @@ ptrEq x y = isTrue# (Exts.reallyUnsafePtrEquality# x y Exts.==# 1#)
 {-# INLINEABLE ptrEq #-}
 
 data WordMap v
-  = Nil
-  | Tip  !Key v
+  = Full !Key !Offset !(SmallArray (WordMap v))
   | Node !Key !Offset !Mask !(SmallArray (WordMap v))
-  | Full !Key !Offset !(SmallArray (WordMap v))
+  | Tip  !Key v
+  | Nil
   deriving Show
 
 node :: Key -> Offset -> Mask -> SmallArray (WordMap v) -> WordMap v
 node k o 0xffff a = Full k o a
 node k o m a      = Node k o m a
+{-# INLINE node #-}
 
 instance NFData v => NFData (WordMap v) where
   rnf Nil = ()
@@ -142,23 +143,18 @@ lookup !_ Nil = Nothing
 lookup k (Tip ok ov)
   | k == ok   = Just ov
   | otherwise = Nothing
-lookup k (Node _ o m a) | b <- mask k o, m .&. b /= 0 = lookup k $ indexSmallArray a (popCount (m .&. (b - 1)))
-  | otherwise = Nothing
-{-
 lookup k (Node _ o m a)
-    | d <- maskBit k o, testBit m d = lookup k $ indexSmallArray a (offset d m)
-    | otherwise = Nothing
--}
+  | m .&. b == 0 = Nothing
+  | otherwise   = lookup k (indexSmallArray a (popCount (m .&. (b - 1))))
+  where b = mask k o 
 lookup k (Full _ o a) = lookup k $ indexSmallArray a (maskBit k o)
 {-# INLINEABLE lookup #-}
 
 member :: Key -> WordMap v -> Bool
-member !k xs0 = go xs0 where
-  go Nil = False
-  go (Tip ok _) = k == ok
-  -- go (Node _ o m a) | d <- maskBit k o, testBit m d && go (indexSmallArray a (offset d m))
-  go (Node _ o m a) | b <- mask k o = m .&. b /= 0 && go (indexSmallArray a (popCount (m .&. (b - 1))))
-  go (Full _ o a) = go (indexSmallArray a (maskBit k o))
+member !_ Nil = False
+member k (Tip ok _) = k == ok
+member k (Node _ o m a) | b <- mask k o = m .&. b /= 0 && member k (indexSmallArray a (popCount (m .&. (b - 1))))
+member k (Full _ o a) = member k (indexSmallArray a (maskBit k o))
 {-# INLINEABLE member #-}
   
 updateSmallArray :: Int -> a -> SmallArray a -> SmallArray a
@@ -187,7 +183,7 @@ insertSmallArray !k a i = runST $ do
 {-# INLINEABLE insertSmallArray #-}
 
 two :: a -> a -> SmallArray a
-two a b = runST $ do
+two !a !b = runST $ do
   arr <- newSmallArray 2 b
   writeSmallArray arr 0 a
   unsafeFreezeSmallArray arr
@@ -228,16 +224,6 @@ fromList xs = foldl' (\r (k,v) -> insert k v r) Nil xs
 
 main :: IO ()
 main = do
-
-    let denseM = M.fromAscList elems :: M.IntMap Int
-        denseW = fromList welems :: WordMap Word64
-        denseH = H.fromList welems :: HashMap Word64 Word64
-        sparseM = M.fromAscList sElems :: M.IntMap Int
-        sparseW = fromList wsElems :: WordMap Word64
-        sparseH = H.fromList wsElems :: HashMap Word64 Word64
-        sparseM' = M.fromAscList sElemsSearch :: M.IntMap Int
-        sparseW' = fromList wsElemsSearch :: WordMap Word64
-        sparseH' = H.fromList wsElemsSearch :: HashMap Word64 Word64
     evaluate $ rnf [denseM, sparseM, sparseM']
     evaluate $ rnf [denseW, sparseW, sparseW']
     evaluate $ rnf [denseH, sparseH, sparseH']
@@ -286,6 +272,16 @@ main = do
             ]
         ]
   where
+    denseM = M.fromAscList elems :: M.IntMap Int
+    denseW = fromList welems :: WordMap Word64
+    denseH = H.fromList welems :: HashMap Word64 Word64
+    sparseM = M.fromAscList sElems :: M.IntMap Int
+    sparseW = fromList wsElems :: WordMap Word64
+    sparseH = H.fromList wsElems :: HashMap Word64 Word64
+    sparseM' = M.fromAscList sElemsSearch :: M.IntMap Int
+    sparseW' = fromList wsElemsSearch :: WordMap Word64
+    sparseH' = H.fromList wsElemsSearch :: HashMap Word64 Word64
+
     elems = zip keys values
     keys = [1..2^12]
     values = [1..2^12]

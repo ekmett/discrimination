@@ -59,7 +59,7 @@ library
 benchmark wordmap
   type:           exitcode-stdio-1.0
   main-is:        AMT.hs
-  ghc-options:    -Wall -O2 -threaded
+  ghc-options:    -Wall -O2 -threaded -ffun-to-thunk -flate-dmd-anal -fmax-inline-alloc-size=2048 -fmax-inline-memcpy-insns=64 -fmax-inline-memset-insns=64 -fno-state-hack -fstatic-argument-transformation -fliberate-case
   hs-source-dirs: benchmarks
   build-depends:
     base,
