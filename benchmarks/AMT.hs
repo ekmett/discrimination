@@ -117,22 +117,22 @@ offset k w = popCount $ w .&. (unsafeShiftL 1 k - 1)
 
 insert :: Key -> v -> WordMap v -> WordMap v
 insert !k v xs0 = go xs0 where
-  make o ok on = Node k o (mask k o .|. mask ok o) $ if k < ok then two (Tip k v) on else two on (Tip k v)
+  pair o ok on = Node k o (mask k o .|. mask ok o) $ if k < ok then two (Tip k v) on else two on (Tip k v)
   go on@(Full ok n as)
-    | o <- level (xor k ok), o > n = make o ok on
-    | d <- maskBit k n, !oz <- indexSmallArray as d, !z  <- go oz, not (ptrEq z oz) = Full ok n (update16 d z as)
+    | o <- level (xor k ok), o > n = pair o ok on
+    | d <- maskBit k n, !oz <- indexSmallArray as d, !z <- go oz, not (ptrEq z oz) = Full ok n (update16 d z as)
     | otherwise = on
   go on@(Node ok n m as)
-    | o > n = make o ok on
-    | not (testBit m d) = node ok n (unsafeShiftL 1 d .|. m) (insertSmallArray odm (Tip k v) as)
+    | o <- level (xor k ok), o > n = pair o ok on
+    | m .&. b == 0 = node ok n (m .|. b) (insertSmallArray odm (Tip k v) as)
     | !oz <- indexSmallArray as odm, !z <- go oz, not (ptrEq z oz) = Node ok n m (updateSmallArray odm z as)
     | otherwise = on
     where
-      o = level (xor k ok)
-      d = maskBit k n
-      odm = offset d m
+      d = fromIntegral (unsafeShiftR k n .&. 0xf)
+      b = unsafeShiftL 1 d
+      odm = popCount $ m .&. (b - 1)
   go on@(Tip ok ov)
-    | k /= ok, o <- level (xor k ok) = make o ok on
+    | k /= ok, o <- level (xor k ok) = pair o ok on
     | ptrEq v ov = on
     | otherwise  = Tip k v
   go Nil = Tip k v
