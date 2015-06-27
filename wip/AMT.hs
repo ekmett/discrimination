@@ -48,7 +48,7 @@ instance Exts.IsList (Array a) where
       | otherwise = indexArray arr k : go (k+1)
   fromListN n xs0 = runST $ do
     arr <- newArray n undefined
-    let go k []     = return ()
+    let go _ []     = return ()
         go k (x:xs) = writeArray arr k x >> go (k+1) xs
     go 0 xs0
     unsafeFreezeArray arr
@@ -145,7 +145,7 @@ offset k w = popCount $ w .&. (bit k - 1)
 insert :: Key -> v -> WordMap v -> WordMap v
 insert !k v xs0 = go xs0 where 
   go Nil = Tip k v
-  go ot@(Tip ok ov)
+  go ot@(Tip ok _)
     | k == ok = t
     | o <- level (xor k ok) = Node k o (setBit (mask k o) (maskBit ok o))
          $ if k < ok then two t ot else two ot t
@@ -156,14 +156,14 @@ insert !k v xs0 = go xs0 where
       | o > n -> Node k o (setBit (mask k o) (maskBit ok o))
                $ if k < ok then two (Tip k v) on else two on (Tip k v)
       | d <- maskBit k n -> if 
-        | testBit m d -> Node ok n m            (updateArray (offset d m) (insert k v) as)
+        | testBit m d -> Node ok n m            (updateArray (offset d m) go as)
         | otherwise   -> node ok n (setBit m d) (insertArray (offset d m) (Tip k v) as)
   go on@(Full ok n as)
     | o <- level (xor k ok)
     = if 
       | o > n -> Node k o (setBit (mask k o) (maskBit ok o))
                $ if k < ok then two (Tip k v) on else two on (Tip k v)
-      | otherwise -> Full ok n (updateArray (maskBit k n) (insert k v) as)
+      | otherwise -> Full ok n (updateArray (maskBit k n) go as)
       
 {-# INLINE insert #-}
 
@@ -173,18 +173,18 @@ lookup !k xs0 = go xs0 where
   go (Tip ok ov)
     | k == ok   = Just ov
     | otherwise = Nothing
-  go (Node ok o m a) 
-    | d <- maskBit k o, testBit m d = lookup k $ indexArray a (offset d m)
+  go (Node _ o m a)
+    | d <- maskBit k o, testBit m d = go $ indexArray a (offset d m)
     | otherwise = Nothing
-  go (Full ok o a) = lookup k (indexArray a (maskBit k o))
+  go (Full _ o a) = go (indexArray a (maskBit k o))
 {-# INLINE lookup #-}
 
 member :: Key -> WordMap v -> Bool
 member !k xs0 = go xs0 where
   go Nil = False
   go (Tip ok _) = k == ok
-  go (Node ok o m a) | d <- maskBit k o = testBit m d && member k (indexArray a (offset d m))
-  go (Full ok o a) = member k (indexArray a (maskBit k o))
+  go (Node _ o m a) | d <- maskBit k o = testBit m d && go (indexArray a (offset d m))
+  go (Full _ o a) = go (indexArray a (maskBit k o))
 {-# INLINE member #-}
   
 updateArray :: Int -> (a -> a) -> Array a -> Array a
@@ -234,10 +234,10 @@ main = do
     evaluate $ rnf [denseW, sparseW, sparseW']
     evaluate $ rnf [denseH, sparseH, sparseH']
     evaluate $ rnf [elems,  sElems,  sElemsSearch]
-    evaluate $ rnf [keys,   sKeys,   sKeysSearch]
+    evaluate $ rnf [keys,   sKeys, sKeysSearch]
     evaluate $ rnf [values, sValues]
     evaluate $ rnf [welems,  wsElems,  wsElemsSearch]
-    evaluate $ rnf [wkeys,   wsKeys,   wsKeysSearch]
+    evaluate $ rnf [wkeys,   wsKeys, wsKeysSearch]
     evaluate $ rnf [wvalues, wsValues]
     defaultMain
         [ bgroup "lookup"
@@ -254,14 +254,14 @@ main = do
             ]
         , bgroup "member"
             [ bgroup "present"
-                [ bench "IntMap"  $ whnf (\m -> foldl' (\n x -> if M.member x m then n + 1 else n) 0 keys) denseM
-                , bench "WordMap" $ whnf (\m -> foldl' (\n x -> if member x m then n + 1 else n) 0 wkeys) denseW
-                , bench "HashMap" $ whnf (\m -> foldl' (\n x -> if H.member x m then n + 1 else n) 0 wkeys) denseH
+                [ bench "IntMap"  $ whnf (\m -> foldl' (\n x -> if M.member x m then n + 1 else n) (0 :: Int) keys) denseM
+                , bench "WordMap" $ whnf (\m -> foldl' (\n x -> if member x m then n + 1 else n) (0 :: Int) wkeys) denseW
+                , bench "HashMap" $ whnf (\m -> foldl' (\n x -> if H.member x m then n + 1 else n) (0 :: Int) wkeys) denseH
                 ]
             , bgroup "absent"
-                [ bench "IntMap"  $ whnf (\m -> foldl' (\n x -> if M.member x m then n + 1 else n) 0 sKeysSearch) sparseM
-                , bench "WordMap" $ whnf (\m -> foldl' (\n x -> if member x m then n + 1 else n) 0 wsKeysSearch) sparseW
-                , bench "HashMap" $ whnf (\m -> foldl' (\n x -> if H.member x m then n + 1 else n) 0 wsKeysSearch) sparseH
+                [ bench "IntMap"  $ whnf (\m -> foldl' (\n x -> if M.member x m then n + 1 else n) (0 :: Int) sKeysSearch) sparseM
+                , bench "WordMap" $ whnf (\m -> foldl' (\n x -> if member x m then n + 1 else n) (0 :: Int) wsKeysSearch) sparseW
+                , bench "HashMap" $ whnf (\m -> foldl' (\n x -> if H.member x m then n + 1 else n) (0 :: Int) wsKeysSearch) sparseH
                 ]
             ]
         , bgroup "insert"
