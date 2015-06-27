@@ -117,14 +117,14 @@ offset k w = popCount $ w .&. (unsafeShiftL 1 k - 1)
 
 insert :: Key -> v -> WordMap v -> WordMap v
 insert !k v xs0 = go xs0 where
-  make o ok on = Node k o (setBit (mask k o) (maskBit ok o)) $ if k < ok then two (Tip k v) on else two on (Tip k v)
+  make o ok on = Node k o (mask k o .|. mask ok o) $ if k < ok then two (Tip k v) on else two on (Tip k v)
   go on@(Full ok n as)
     | o <- level (xor k ok), o > n = make o ok on
     | d <- maskBit k n, !oz <- indexSmallArray as d, !z  <- go oz, not (ptrEq z oz) = Full ok n (update16 d z as)
     | otherwise = on
   go on@(Node ok n m as)
     | o > n = make o ok on
-    | not (testBit m d) = node ok n (setBit m d) (insertSmallArray odm (Tip k v) as)
+    | not (testBit m d) = node ok n (unsafeShiftL 1 d .|. m) (insertSmallArray odm (Tip k v) as)
     | !oz <- indexSmallArray as odm, !z <- go oz, not (ptrEq z oz) = Node ok n m (updateSmallArray odm z as)
     | otherwise = on
     where
