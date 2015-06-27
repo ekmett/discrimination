@@ -16,6 +16,7 @@ import Data.Bits
 import Data.Bits.Extras
 import Data.Foldable
 import Data.Functor
+import Data.HashMap.Strict (HashMap)
 import Data.Maybe (fromMaybe)
 import Data.Monoid
 import Data.Primitive.Array
@@ -25,7 +26,6 @@ import qualified GHC.Exts as Exts
 import Prelude hiding (lookup, length, foldr)
 import qualified Prelude
 import qualified Data.IntMap as M
-import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as H
 import GHC.Types
 
@@ -79,6 +79,10 @@ data WordMap v
   | Tip  !Key v
   | Node !Key !Offset !Mask !(Array (WordMap v))
   | Full !Key !Offset !(Array (WordMap v))
+
+node :: Key -> Offset -> Mask -> Array (WordMap v) -> WordMap v
+node k o 0xffff a = Full k o a
+node k o m a      = Node k o m a
 
 instance NFData v => NFData (WordMap v) where
   rnf Nil = ()
@@ -153,7 +157,7 @@ insert !k v xs0 = go xs0 where
                $ if k < ok then two (Tip k v) on else two on (Tip k v)
       | d <- maskBit k n -> if 
         | testBit m d -> Node ok n m            (updateArray (offset d m) (insert k v) as)
-        | otherwise   -> Node ok n (setBit m d) (insertArray (offset d m) (Tip k v) as)
+        | otherwise   -> node ok n (setBit m d) (insertArray (offset d m) (Tip k v) as)
   go on@(Full ok n as)
     | o <- level (xor k ok)
     = if 
