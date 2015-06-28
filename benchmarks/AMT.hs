@@ -75,6 +75,7 @@ ptrNeq x y = isTrue# (Exts.reallyUnsafePtrEquality# x y Exts./=# 1#)
 data WordMap v
   = Full !Key !Offset !(SmallArray (WordMap v))
   | Node !Key !Offset !Mask !(SmallArray (WordMap v))
+  | Fork !Key !Key !Offset !(WordMap v) !(WordMap v)
   | Tip  !Key v
   | Nil
   deriving Show
@@ -87,6 +88,7 @@ node k o m a       = Node k o m a
 instance NFData v => NFData (WordMap v) where
   rnf (Full _ _ a)   = rnf a
   rnf (Node _ _ _ a) = rnf a
+  rnf (Fork _ _ _ a b) = rnf a `seq` rnf b
   rnf (Tip _ v)      = rnf v
   rnf Nil = ()
 
@@ -94,6 +96,7 @@ instance Functor WordMap where
   fmap f = go where
     go (Full k o a) = Full k o (fmap go a)
     go (Node k o m a) = Node k o m (fmap go a)
+    go (Fork k k' o v v') = Fork k k' o (go v) (go v')
     go (Tip k v) = Tip k (f v)
     go Nil = Nil
   {-# INLINEABLE fmap #-}
@@ -102,6 +105,7 @@ instance Foldable WordMap where
   foldMap f = go where
     go (Full _ _ a) = foldMap go a
     go (Node _ _ _ a) = foldMap go a
+    go (Fork _ _ _ v v') = go v `mappend` go v'
     go (Tip _ v) = f v
     go Nil = mempty
   {-# INLINEABLE foldMap #-}
@@ -110,6 +114,7 @@ instance Traversable WordMap where
   traverse f = go where
     go (Full k o a) = Full k o <$> traverse go a
     go (Node k o m a) = Node k o m <$> traverse go a
+    go (Fork k k' o v v') = Fork k k' o <$> go v <*> go v'
     go (Tip k v) = Tip k <$> f v
     go Nil = pure Nil
   {-# INLINEABLE traverse #-}
@@ -140,10 +145,9 @@ offset k w = popCount $ w .&. (unsafeShiftL 1 k - 1)
 
 insert :: Key -> v -> WordMap v -> WordMap v
 insert !k v xs0 = go xs0 where
-  pair o ok on = Node (k .&. unsafeShiftL 0xffffffffffffffe0 o) o (mask k o .|. mask ok o) $ runST $ do
-    arr <- newSmallArray 2 (Tip k v)
-    writeSmallArray arr (fromEnum (k < ok)) on
-    unsafeFreezeSmallArray arr
+  pair o ok on
+    | k < ok    = Fork k ok o (Tip k v) on
+    | otherwise = Fork ok k o on (Tip k v)
   go on@(Full ok n as)
     | wd > 0x1f = pair (level okk) ok on
     | !oz <- indexSmallArray as d
@@ -171,6 +175,19 @@ insert !k v xs0 = go xs0 where
     | k /= ok    = pair (level (xor ok k)) ok on
     | ptrEq v ov = on
     | otherwise  = Tip k v
+  go on@(Fork lk rk o l r)
+    | wdl > 0x1f = pair (level klk) lk on
+    | wdl == 0, !l' <- go l = if ptrEq l l' then on else Fork lk rk o l' r
+    | wdr == 0, !r' <- go r = if ptrEq r r' then on else Fork lk rk o l r'
+    | otherwise = Node (k .&. unsafeShiftL 0xffffffffffffffe0 o) o (mask lk o .|. mask rk o .|. mask k o) $ runST $ do
+      arr <- newSmallArray 3 (Tip k v)
+      writeSmallArray arr (fromEnum (k < lk)) l
+      writeSmallArray arr (1 + fromEnum (k < rk)) r
+      unsafeFreezeSmallArray arr
+    where klk = xor k lk
+          wdl = unsafeShiftR klk o
+          krk = xor k rk
+          wdr = unsafeShiftR krk o
   go Nil = Tip k v
 {-# INLINEABLE insert #-}
 
@@ -184,6 +201,10 @@ lookup k (Node ok o m a)
   where
     z = unsafeShiftR (xor k ok) o
     b = unsafeShiftL 1 (fromIntegral z)
+lookup k (Fork lk rk o l r)
+  | unsafeShiftR (xor k lk) o == 0 = lookup k l
+  | unsafeShiftR (xor k rk) o == 0 = lookup k r
+  | otherwise = Nothing
 lookup k (Tip ok ov)
   | k == ok   = Just ov
   | otherwise = Nothing
@@ -197,6 +218,9 @@ member k (Node ok o m a)
   | z <- unsafeShiftR (xor k ok) o
   = z <= 0x1f && let b = unsafeShiftL 1 (fromIntegral z) in
     m .&. b /= 0 && member k (indexSmallArray a (popCount (m .&. (b - 1))))
+member k (Fork lk rk o l r)
+  =  (unsafeShiftR (xor k lk) o == 0 && member k l)
+  || (unsafeShiftR (xor k rk) o == 0 && member k r)
 member k (Tip ok _) = k == ok
 member _ Nil = False
 {-# INLINEABLE member #-}
