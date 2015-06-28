@@ -26,7 +26,6 @@ import Data.Functor
 import Data.HashMap.Lazy (HashMap)
 import Data.Maybe (fromMaybe)
 import Data.Monoid
--- import Data.Primitive.Array
 import Data.Traversable
 import Data.Word
 import qualified GHC.Exts as Exts
@@ -134,22 +133,32 @@ offset k w = popCount $ w .&. (unsafeShiftL 1 k - 1)
 
 insert :: Key -> v -> WordMap v -> WordMap v
 insert !k v xs0 = go xs0 where
-  pair o ok on = Node k o (mask k o .|. mask ok o) $ if k < ok then two (Tip k v) on else two on (Tip k v)
+  pair o ok on = Node (k .&. complement (unsafeShiftL 0xf o)) o (mask k o .|. mask ok o) $ if k < ok then two (Tip k v) on else two on (Tip k v)
   go on@(Full ok n as)
-    | o <- level (xor k ok), o > n = pair o ok on
-    | d <- maskBit k n, !oz <- indexSmallArray as d, !z <- go oz, ptrNeq z oz = Full ok n (update16 d z as)
-    | otherwise = on
-  go on@(Node ok n m as)
-    | o <- level (xor k ok), o > n = pair o ok on
-    | m .&. b == 0 = node ok n (m .|. b) (insertSmallArray odm (Tip k v) as)
-    | !oz <- indexSmallArray as odm, !z <- go oz, ptrNeq z oz = Node ok n m (updateSmallArray odm z as)
+    | wd > 0xf = pair (level okk) ok on
+    | !oz <- indexSmallArray as d
+    , !z <- go oz
+    , ptrNeq z oz = Full ok n (update16 d z as)
     | otherwise = on
     where
-      d = fromIntegral (unsafeShiftR k n .&. 0xf)
-      b = unsafeShiftL 1 d
+      okk = xor ok k
+      wd  = unsafeShiftR okk n
+      d   = fromIntegral wd
+  go on@(Node ok n m as)
+    | wd > 0xf = pair (level okk) ok on
+    | m .&. b == 0 = node ok n (m .|. b) (insertSmallArray odm (Tip k v) as)
+    | !oz <- indexSmallArray as odm
+    , !z <- go oz
+    , ptrNeq z oz = Node ok n m (updateSmallArray odm z as)
+    | otherwise = on
+    where
+      okk = xor ok k
+      wd  = unsafeShiftR okk n
+      d   = fromIntegral wd
+      b   = unsafeShiftL 1 d
       odm = popCount $ m .&. (b - 1)
   go on@(Tip ok ov)
-    | k /= ok, o <- level (xor k ok) = pair o ok on
+    | k /= ok    = pair (level (xor ok k)) ok on
     | ptrEq v ov = on
     | otherwise  = Tip k v
   go Nil = Tip k v
