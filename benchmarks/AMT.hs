@@ -59,7 +59,7 @@ runSTRep st_rep = case st_rep realWorld# of
 #endif
 
 type Key = Word64
-type Mask = Word16
+type Mask = Word32
 type Offset = Int
 
 pattern N = 16
@@ -80,14 +80,14 @@ data WordMap v
   deriving Show
 
 node :: Key -> Offset -> Mask -> SmallArray (WordMap v) -> WordMap v
-node k o 0xffff a = Full k o a
-node k o m a      = Node k o m a
+node k o 0xffffffff a = Full k o a
+node k o m a       = Node k o m a
 {-# INLINE node #-}
 
 instance NFData v => NFData (WordMap v) where
   rnf (Full _ _ a)   = rnf a
   rnf (Node _ _ _ a) = rnf a
-  rnf (Tip _ v) = rnf v
+  rnf (Tip _ v)      = rnf v
   rnf Nil = ()
 
 instance Functor WordMap where
@@ -114,41 +114,48 @@ instance Traversable WordMap where
     go Nil = pure Nil
   {-# INLINEABLE traverse #-}
 
+-- >>> level . bit <$> [0..63]
+-- [0,0,0,0,5,5,5,5,5,10,10,10,10,10,15,15,15,15,15,20,20,20,20,20,25,25,25,25,25,30,30,30,30,30,35,35,35,35,35,40,40,40,40,40,45,45,45,45,45,50,50,50,50,50,55,55,55,55,55,60,60,60,60,60]
+
+-- better would be
+-- [0,0,0,0,0,5,5,5,5,5,10,10,10,10,10,15,15,15,15,15,20,20,20,20,20,25,25,25,25,25,30,30,30,30,30,35,35,35,35,35,40,40,40,40,40,45,45,45,45,45,50,50,50,50,50,55,55,55,55,55,60,60,60,60]
+
 -- Note: 'level 0' will return a negative shift, don't use it
 level :: Key -> Int
-level w = 60 - (countLeadingZeros w .&. 0x7c)
+level w = 60 - l + mod l 5 -- (countLeadingZeros w .&. 0x7c)
+  where l = countLeadingZeros w
 {-# INLINE level #-}
 
 maskBit :: Key -> Offset -> Int
-maskBit k o = fromIntegral (unsafeShiftR k o .&. 0xf)
+maskBit k o = fromIntegral (unsafeShiftR k o .&. 0x1f)
 {-# INLINE maskBit #-}
 
-mask :: Key -> Offset -> Word16
+mask :: Key -> Offset -> Mask
 mask k o = unsafeShiftL 1 (maskBit k o)
 {-# INLINE mask #-}
 
-offset :: Int -> Word16 -> Int
+offset :: Int -> Mask -> Int
 offset k w = popCount $ w .&. (unsafeShiftL 1 k - 1)
 {-# INLINE offset #-}
 
 insert :: Key -> v -> WordMap v -> WordMap v
 insert !k v xs0 = go xs0 where
-  pair o ok on = Node (k .&. unsafeShiftL 0xfffffffffffffff0 o) o (mask k o .|. mask ok o) $ runST $ do
+  pair o ok on = Node (k .&. unsafeShiftL 0xffffffffffffffe0 o) o (mask k o .|. mask ok o) $ runST $ do
     arr <- newSmallArray 2 (Tip k v)
     writeSmallArray arr (fromEnum (k < ok)) on
     unsafeFreezeSmallArray arr
   go on@(Full ok n as)
-    | wd > 0xf = pair (level okk) ok on
+    | wd > 0x1f = pair (level okk) ok on
     | !oz <- indexSmallArray as d
     , !z <- go oz
-    , ptrNeq z oz = Full ok n (update16 d z as)
+    , ptrNeq z oz = Full ok n (update32 d z as)
     | otherwise = on
     where
       okk = xor ok k
       wd  = unsafeShiftR okk n
       d   = fromIntegral wd
   go on@(Node ok n m as)
-    | wd > 0xf = pair (level okk) ok on
+    | wd > 0x1f = pair (level okk) ok on
     | m .&. b == 0 = node ok n (m .|. b) (insertSmallArray odm (Tip k v) as)
     | !oz <- indexSmallArray as odm
     , !z <- go oz
@@ -169,10 +176,10 @@ insert !k v xs0 = go xs0 where
 
 lookup :: Key -> WordMap v -> Maybe v
 lookup !k (Full ok o a)
-  | z <- unsafeShiftR (xor k ok) o, z <= 0xf = lookup k $ indexSmallArray a (fromIntegral z)
+  | z <- unsafeShiftR (xor k ok) o, z <= 0x1f = lookup k $ indexSmallArray a (fromIntegral z)
   | otherwise = Nothing
 lookup k (Node ok o m a)
-  | z <= 0xf && m .&. b /= 0 = lookup k (indexSmallArray a (popCount (m .&. (b - 1))))
+  | z <= 0x1f && m .&. b /= 0 = lookup k (indexSmallArray a (popCount (m .&. (b - 1))))
   | otherwise = Nothing
   where
     z = unsafeShiftR (xor k ok) o
@@ -185,10 +192,10 @@ lookup _ Nil = Nothing
 
 member :: Key -> WordMap v -> Bool
 member !k (Full ok o a)
-  | z <- unsafeShiftR (xor k ok) o = z <= 0xf && member k (indexSmallArray a (fromIntegral z))
+  | z <- unsafeShiftR (xor k ok) o = z <= 0x1f && member k (indexSmallArray a (fromIntegral z))
 member k (Node ok o m a)
   | z <- unsafeShiftR (xor k ok) o
-  = z <= 0xf && let b = unsafeShiftL 1 (fromIntegral z) in
+  = z <= 0x1f && let b = unsafeShiftL 1 (fromIntegral z) in
     m .&. b /= 0 && member k (indexSmallArray a (popCount (m .&. (b - 1))))
 member k (Tip ok _) = k == ok
 member _ Nil = False
@@ -203,12 +210,12 @@ updateSmallArray !k a i = runST $ do
   unsafeFreezeSmallArray o
 {-# INLINEABLE updateSmallArray #-}
 
-update16 :: Int -> a -> SmallArray a -> SmallArray a
-update16 !k a i = runST $ do
-  o <- clone16 i
+update32 :: Int -> a -> SmallArray a -> SmallArray a
+update32 !k a i = runST $ do
+  o <- clone32 i
   writeSmallArray o k a
   unsafeFreezeSmallArray o
-{-# INLINEABLE update16 #-}
+{-# INLINEABLE update32 #-}
 
 insertSmallArray :: Int -> a -> SmallArray a -> SmallArray a
 insertSmallArray !k a i = runST $ do
@@ -219,9 +226,9 @@ insertSmallArray !k a i = runST $ do
   unsafeFreezeSmallArray o
 {-# INLINEABLE insertSmallArray #-}
 
-clone16 :: SmallArray a -> ST s (SmallMutableArray s a)
-clone16 i = do
-  o <- newSmallArray 16 undefined
+clone32 :: SmallArray a -> ST s (SmallMutableArray s a)
+clone32 i = do
+  o <- newSmallArray 32 undefined
   indexSmallArrayM i 0 >>= writeSmallArray o 0
   indexSmallArrayM i 1 >>= writeSmallArray o 1
   indexSmallArrayM i 2 >>= writeSmallArray o 2
@@ -238,8 +245,24 @@ clone16 i = do
   indexSmallArrayM i 13 >>= writeSmallArray o 13
   indexSmallArrayM i 14 >>= writeSmallArray o 14
   indexSmallArrayM i 15 >>= writeSmallArray o 15
+  indexSmallArrayM i 16 >>= writeSmallArray o 16
+  indexSmallArrayM i 17 >>= writeSmallArray o 17
+  indexSmallArrayM i 18 >>= writeSmallArray o 18
+  indexSmallArrayM i 19 >>= writeSmallArray o 19
+  indexSmallArrayM i 20 >>= writeSmallArray o 20
+  indexSmallArrayM i 21 >>= writeSmallArray o 21
+  indexSmallArrayM i 22 >>= writeSmallArray o 22
+  indexSmallArrayM i 23 >>= writeSmallArray o 23
+  indexSmallArrayM i 24 >>= writeSmallArray o 24
+  indexSmallArrayM i 25 >>= writeSmallArray o 25
+  indexSmallArrayM i 26 >>= writeSmallArray o 26
+  indexSmallArrayM i 27 >>= writeSmallArray o 27
+  indexSmallArrayM i 28 >>= writeSmallArray o 28
+  indexSmallArrayM i 29 >>= writeSmallArray o 29
+  indexSmallArrayM i 30 >>= writeSmallArray o 30
+  indexSmallArrayM i 31 >>= writeSmallArray o 31
   return o
-{-# INLINE clone16 #-}
+{-# INLINE clone32 #-}
 
 -- so we need to be able to quickly check if we differ on a higher nybble than the one
 -- the word32s are the least and greatest keys possible in this node, not present
