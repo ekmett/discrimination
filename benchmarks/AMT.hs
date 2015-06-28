@@ -219,13 +219,6 @@ insertSmallArray !k a i = runST $ do
   unsafeFreezeSmallArray o
 {-# INLINEABLE insertSmallArray #-}
 
-two :: a -> a -> SmallArray a
-two !a !b = runST $ do
-  arr <- newSmallArray 2 b
-  writeSmallArray arr 0 a
-  unsafeFreezeSmallArray arr
-{-# INLINE two #-}
-
 clone16 :: SmallArray a -> ST s (SmallMutableArray s a)
 clone16 i = do
   o <- newSmallArray 16 undefined
