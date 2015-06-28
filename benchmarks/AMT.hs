@@ -133,7 +133,10 @@ offset k w = popCount $ w .&. (unsafeShiftL 1 k - 1)
 
 insert :: Key -> v -> WordMap v -> WordMap v
 insert !k v xs0 = go xs0 where
-  pair o ok on = Node (k .&. complement (unsafeShiftL 0xf o)) o (mask k o .|. mask ok o) $ if k < ok then two (Tip k v) on else two on (Tip k v)
+  pair o ok on = Node (k .&. unsafeShiftL 0xfffffffffffffff0 o) o (mask k o .|. mask ok o) $ runST $ do
+    arr <- newSmallArray 2 (Tip k v)
+    writeSmallArray arr (fromEnum (k < ok)) on
+    unsafeFreezeSmallArray arr
   go on@(Full ok n as)
     | wd > 0xf = pair (level okk) ok on
     | !oz <- indexSmallArray as d
