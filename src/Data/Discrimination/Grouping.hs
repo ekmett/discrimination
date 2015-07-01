@@ -25,14 +25,13 @@ module Data.Discrimination.Grouping
   , runGroup
   -- * Internals
   , hashing
-  , groupingNat
   ) where
 
 import Control.Monad hiding (mapM_)
 import Control.Monad.Primitive
 import Control.Monad.ST
-import Data.Bits
 import Data.Complex
+import Data.Discrimination.Internal.WordMap as WordMap
 import Data.Foldable hiding (concat)
 import Data.Functor.Compose
 import Data.Functor.Contravariant
@@ -46,7 +45,6 @@ import Data.Promise
 import Data.Proxy
 import Data.Ratio
 import Data.Typeable
-import qualified Data.Vector.Mutable as UM
 import Data.Void
 import Data.Word
 import Prelude hiding (read, concat, mapM_)
@@ -93,26 +91,12 @@ instance Monoid (Group a) where
 -- Primitives
 --------------------------------------------------------------------------------
 
-data GroupingState m b
-  = Zero
-  | One {-# UNPACK #-} !Int (b -> m ())
-  | Many (UM.MVector (PrimState m) (Maybe (b -> m ())))
-
-groupingNat :: Int -> Group Int
-groupingNat n = Group $ \k -> do
-  mt <- newMutVar Zero
-  return $ \ a b -> readMutVar mt >>= \case
-    Zero -> k b >>= writeMutVar mt . One a
-    One az mz
-      | az == a -> mz b
-      | otherwise -> do
-        t <- UM.replicate n Nothing
-        UM.write t az (Just mz)
-        writeMutVar mt (Many t)
-        k b >>= UM.write t a . Just
-    Many t -> UM.read t a >>= \case
-      Nothing -> k b >>= UM.write t a . Just
-      Just k' -> k' b
+groupingWord64 :: Group Word64
+groupingWord64 = Group $ \k -> do
+  mt <- newMutVar WordMap.empty
+  return $ \a b -> readMutVar mt >>= \m -> case WordMap.lookup a m of
+    Nothing -> k b >>= \p -> writeMutVar mt (insert a p m)
+    Just n -> n b
 
 -- | This may be useful for pragmatically accelerating a grouping structure by
 -- preclassifying by a hash function
@@ -146,52 +130,16 @@ class Grouping a where
 instance Grouping Void where
   grouping = lose id
 
-instance Grouping Word8 where
-  grouping = contramap fromIntegral (groupingNat 256)
-
-instance Grouping Word16 where
-  grouping = divide (\x -> (fromIntegral (unsafeShiftR x 8), fromIntegral x .&. 0xff)) (groupingNat 256) (groupingNat 256)
-
-instance Grouping Word32 where
-  grouping = divide (\x -> ( (fromIntegral (unsafeShiftR x 24)        , fromIntegral (unsafeShiftR x 16) .&. 0xff)
-                           , (fromIntegral (unsafeShiftR x 8) .&. 0xff, fromIntegral x                   .&. 0xff)
-                           )
-                    )
-    (divide id (groupingNat 256) (groupingNat 256))
-    (divide id (groupingNat 256) (groupingNat 256))
-
-instance Grouping Word64 where
-  grouping = divide (\x ->
-      ( ( (fromIntegral (unsafeShiftR x 56)         , fromIntegral (unsafeShiftR x 48) .&. 0xff)
-        , (fromIntegral (unsafeShiftR x 40) .&. 0xff, fromIntegral (unsafeShiftR x 32) .&. 0xff)
-        ),
-        ( (fromIntegral (unsafeShiftR x 24) .&. 0xff, fromIntegral (unsafeShiftR x 16) .&. 0xff)
-        , (fromIntegral (unsafeShiftR x 8)  .&. 0xff, fromIntegral x                   .&. 0xff)
-        )
-      )
-    )
-    (divide id (divide id (groupingNat 256) (groupingNat 256)) (divide id (groupingNat 256) (groupingNat 256)))
-    (divide id (divide id (groupingNat 256) (groupingNat 256)) (divide id (groupingNat 256) (groupingNat 256)))
-
-instance Grouping Word where
-  grouping
-    | (maxBound :: Word) == 4294967295 = contramap (fromIntegral :: Word -> Word32) grouping
-    | otherwise                        = contramap (fromIntegral :: Word -> Word64) grouping
-
-instance Grouping Int8 where
-  grouping = contramap (\x -> fromIntegral x + 128) (groupingNat 256)
-
-instance Grouping Int16 where
-  grouping = contramap (\x -> fromIntegral (x - minBound) :: Word16) grouping
-
-instance Grouping Int32 where
-  grouping = contramap (\x -> fromIntegral (x - minBound) :: Word32) grouping
-
-instance Grouping Int64 where
-  grouping = contramap (\x -> fromIntegral (x - minBound) :: Word64) grouping
-
-instance Grouping Int where
-  grouping = contramap (\x -> fromIntegral (x - minBound) :: Word) grouping
+instance Grouping Word8 where grouping = contramap fromIntegral groupingWord64
+instance Grouping Word16 where grouping = contramap fromIntegral groupingWord64
+instance Grouping Word32 where grouping = contramap fromIntegral groupingWord64
+instance Grouping Word64 where grouping = groupingWord64
+instance Grouping Word where grouping = contramap fromIntegral groupingWord64
+instance Grouping Int8 where grouping = contramap fromIntegral groupingWord64
+instance Grouping Int16 where grouping = contramap fromIntegral groupingWord64
+instance Grouping Int32 where grouping = contramap fromIntegral groupingWord64
+instance Grouping Int64 where grouping = contramap fromIntegral groupingWord64
+instance Grouping Int where grouping = contramap fromIntegral groupingWord64
 
 instance Grouping Bool
 instance (Grouping a, Grouping b) => Grouping (a, b)
