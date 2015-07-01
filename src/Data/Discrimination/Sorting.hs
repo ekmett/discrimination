@@ -2,7 +2,6 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE RoleAnnotations #-}

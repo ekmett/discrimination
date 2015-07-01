@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP, MagicHash, UnboxedTuples, DeriveDataTypeable, BangPatterns, TypeFamilies #-}
 
 -- |
--- Module      : SmallArray
+-- Module      : Data.Discrimination.Internal.SmallArray
 -- Copyright   : (c) Edward Kmett 2015
 -- License     : BSD-style
 --
@@ -11,7 +11,7 @@
 -- Small primitive boxed arrays
 --
 
-module StrictSmallArray (
+module Data.Discrimination.Internal.SmallArray (
   SmallArray(..), SmallMutableArray(..),
 
   newSmallArray, readSmallArray, writeSmallArray, indexSmallArray, indexSmallArrayM,
@@ -51,7 +51,7 @@ readSmallArray (SmallMutableArray arr#) (I# i#) = primitive (readSmallArray# arr
 -- | Write a value to the array at the given index.
 writeSmallArray :: PrimMonad m => SmallMutableArray (PrimState m) a -> Int -> a -> m ()
 {-# INLINE writeSmallArray #-}
-writeSmallArray (SmallMutableArray arr#) (I# i#) !x = primitive_ (writeSmallArray# arr# i# x)
+writeSmallArray (SmallMutableArray arr#) (I# i#) x = primitive_ (writeSmallArray# arr# i# x)
 
 -- | Read a value from the immutable array at the given index.
 indexSmallArray :: SmallArray a -> Int -> a

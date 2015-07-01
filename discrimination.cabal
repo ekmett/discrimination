@@ -1,8 +1,8 @@
 name:          discrimination
 category:      Data, Sorting
-version:       0.1
+version:       0.2
 license:       BSD3
-cabal-version: >= 1.10
+cabal-version: >= 1.22
 license-file:  LICENSE
 author:        Edward A. Kmett
 maintainer:    Edward A. Kmett <ekmett@gmail.com>
@@ -11,7 +11,7 @@ homepage:      http://github.com/ekmett/discrimination/
 bug-reports:   http://github.com/ekmett/discrimination/issues
 copyright:     Copyright (C) 2014-2015 Edward A. Kmett
 build-type:    Simple
-tested-with:   GHC == 7.8.4, GHC == 7.10.1
+tested-with:   GHC == 7.10.1
 synopsis:      Fast generic linear-time sorting, joins and container construction.
 description:
   This package provides fast, generic, linear-time discrimination and sorting.
@@ -38,6 +38,8 @@ library
     Data.Discrimination.Class
     Data.Discrimination.Grouping
     Data.Discrimination.Internal
+    Data.Discrimination.Internal.SmallArray
+    Data.Discrimination.Internal.WordMap
     Data.Discrimination.Sorting
 
   build-depends:
@@ -57,15 +59,17 @@ library
     void          >= 0.5    && < 1
 
 benchmark wordmap
-  type:           exitcode-stdio-1.0
-  main-is:        AMT.hs
-  ghc-options:    -Wall -O2 -threaded 
-  hs-source-dirs: benchmarks
+  type:             exitcode-stdio-1.0
+  main-is:          AMT.hs
+  ghc-options:      -Wall -O2 -threaded 
+  hs-source-dirs:   benchmarks
+  default-language: Haskell2010
   build-depends:
     base >= 4.8,
     containers,
     criterion,
     deepseq,
+    discrimination,
     ghc-prim,
     unordered-containers,
     primitive
