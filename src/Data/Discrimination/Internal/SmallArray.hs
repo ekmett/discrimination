@@ -22,18 +22,15 @@ module Data.Discrimination.Internal.SmallArray (
 
 import Control.DeepSeq
 import Control.Monad.Primitive
-
-import GHC.Exts as Exts
+import Data.Foldable as Foldable
+import GHC.Exts
 import GHC.ST
 
-import Data.Typeable ( Typeable )
-
 -- | Boxed arrays
-data SmallArray a = SmallArray (SmallArray# a) deriving ( Typeable )
+data SmallArray a = SmallArray (SmallArray# a)
 
 -- | Mutable boxed arrays associated with a primitive state token.
 data SmallMutableArray s a = SmallMutableArray (SmallMutableArray# s a)
-                                deriving ( Typeable )
 
 -- | Create a new mutable array of the specified size and initialise all
 -- elements with the given value.
@@ -159,21 +156,16 @@ cloneSmallMutableArray (SmallMutableArray arr#) (I# off#) (I# len#) = primitive
    (\s# -> case cloneSmallMutableArray# arr# off# len# s# of
              (# s'#, arr'# #) -> (# s'#, SmallMutableArray arr'# #))
 
-
-instance Exts.IsList (SmallArray a) where
+instance IsList (SmallArray a) where
   type Item (SmallArray a) = a
-  toList !arr = go 0 where
-    n = length arr
-    go !k
-      | k == n    = []
-      | otherwise = indexSmallArray arr k : go (k+1)
+  toList = Foldable.toList
   fromListN n xs0 = runST $ do
     arr <- newSmallArray n undefined
     let go !_ []     = return ()
         go k (x:xs) = writeSmallArray arr k x >> go (k+1) xs
     go 0 xs0
     unsafeFreezeSmallArray arr
-  fromList xs = Exts.fromListN (Prelude.length xs) xs
+  fromList xs = fromListN (Prelude.length xs) xs
 
 instance Functor SmallArray where
   fmap f !i = runST $ do
@@ -189,17 +181,46 @@ instance Functor SmallArray where
     unsafeFreezeSmallArray o
 
 instance Foldable SmallArray where
-  foldr f z a = foldr f z (Exts.toList a)
-  foldMap f a = foldMap f (Exts.toList a)
-  length (SmallArray ary) = I# (Exts.sizeofSmallArray# ary)
+  foldr f z arr = go 0 where
+    n = length arr
+    go !k
+      | k == n    = z
+      | otherwise = f (indexSmallArray arr k) (go (k+1))
+
+  foldl f z arr = go (length arr - 1) where
+    go !k
+      | k < 0 = z
+      | otherwise = f (go (k-1)) (indexSmallArray arr k)
+
+  foldr' f z arr = go 0 where
+    n = length arr
+    go !k
+      | k == n    = z
+      | r <- indexSmallArray arr k = r `seq` f r (go (k+1))
+
+  foldl' f z arr = go (length arr - 1) where
+    go !k
+      | k < 0 = z
+      | r <- indexSmallArray arr k = r `seq` f (go (k-1)) r
+
+  length (SmallArray ary) = I# (sizeofSmallArray# ary)
   {-# INLINE length #-}
 
 instance Traversable SmallArray where
-  traverse f a = Exts.fromListN (length a) <$> traverse f (Exts.toList a)
+  traverse f a = fromListN (length a) <$> traverse f (Foldable.toList a)
 
 instance Show a => Show (SmallArray a) where
   showsPrec d as = showParen (d > 10) $
-    showString "fromListN " . showsPrec 11 (length as) . showChar ' ' . showsPrec 11 (Exts.toList as)
+    showString "fromList " . showsPrec 11 (Foldable.toList as)
+
+instance Read a => Read (SmallArray a) where
+  readsPrec d = readParen (d > 10) $ \s -> [(fromList m, t) | ("fromList",t) <- lex s, (m,u) <- readsPrec 11 t]
+
+instance Ord a => Ord (SmallArray a) where
+  compare as bs = compare (Foldable.toList as) (Foldable.toList bs)
+
+instance Eq a => Eq (SmallArray a) where
+  as == bs = Foldable.toList as == Foldable.toList bs
 
 instance NFData a => NFData (SmallArray a) where
   rnf a0 = go a0 (length a0) 0 where
