@@ -9,9 +9,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 {-# OPTIONS_GHC -Wall -funbox-strict-fields -fno-warn-orphans -fno-warn-type-defaults -O2 #-}
-#ifdef ST_HACK
 {-# OPTIONS_GHC -fno-full-laziness #-}
-#endif
 module Main where
 
 import Control.DeepSeq
