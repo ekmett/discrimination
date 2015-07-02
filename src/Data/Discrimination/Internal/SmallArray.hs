@@ -214,7 +214,7 @@ instance Show a => Show (SmallArray a) where
     showString "fromList " . showsPrec 11 (Foldable.toList as)
 
 instance Read a => Read (SmallArray a) where
-  readsPrec d = readParen (d > 10) $ \s -> [(fromList m, t) | ("fromList", u) <- lex s, (m,u) <- readsPrec 11 t]
+  readsPrec d = readParen (d > 10) $ \s -> [(fromList m, u) | ("fromList", t) <- lex s, (m,u) <- readsPrec 11 t]
 
 instance Ord a => Ord (SmallArray a) where
   compare as bs = compare (Foldable.toList as) (Foldable.toList bs)
