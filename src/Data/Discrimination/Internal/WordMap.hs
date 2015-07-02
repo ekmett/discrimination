@@ -108,14 +108,16 @@ mask k o = unsafeShiftL 1 (maskBit k o)
 -- offset k w = popCount $ w .&. (unsafeShiftL 1 k - 1)
 -- {-# INLINE offset #-}
 
+fork :: Int -> Key -> WordMap v -> Key -> WordMap v -> WordMap v
+fork o k n ok on = Node (k .&. unsafeShiftL 0xfffffffffffffff0 o) o (mask k o .|. mask ok o) $ runST $ do
+  arr <- newSmallArray 2 n
+  writeSmallArray arr (fromEnum (k < ok)) on
+  unsafeFreezeSmallArray arr
+
 insert :: Key -> v -> WordMap v -> WordMap v
 insert !k v xs0 = go xs0 where
-  pair o ok on = Node (k .&. unsafeShiftL 0xfffffffffffffff0 o) o (mask k o .|. mask ok o) $ runST $ do
-    arr <- newSmallArray 2 (Tip k v)
-    writeSmallArray arr (fromEnum (k < ok)) on
-    unsafeFreezeSmallArray arr
   go on@(Full ok n as)
-    | wd > 0xf = pair (level okk) ok on
+    | wd > 0xf = fork (level okk) k (Tip k v) ok on
     | !oz <- indexSmallArray as d
     , !z <- go oz
     , ptrNeq z oz = Full ok n (update16 d z as)
@@ -125,7 +127,7 @@ insert !k v xs0 = go xs0 where
       wd  = unsafeShiftR okk n
       d   = fromIntegral wd
   go on@(Node ok n m as)
-    | wd > 0xf = pair (level okk) ok on
+    | wd > 0xf = fork (level okk) k (Tip k v) ok on
     | m .&. b == 0 = node ok n (m .|. b) (insertSmallArray odm (Tip k v) as)
     | !oz <- indexSmallArray as odm
     , !z <- go oz
@@ -138,11 +140,12 @@ insert !k v xs0 = go xs0 where
       b   = unsafeShiftL 1 d
       odm = popCount $ m .&. (b - 1)
   go on@(Tip ok ov)
-    | k /= ok    = pair (level (xor ok k)) ok on
+    | k /= ok    = fork (level (xor ok k)) k (Tip k v) ok on
     | ptrEq v ov = on
     | otherwise  = Tip k v
   go Nil = Tip k v
 {-# INLINEABLE insert #-}
+
 
 lookup :: Key -> WordMap v -> Maybe v
 lookup !k (Full ok o a)
@@ -218,9 +221,7 @@ clone16 i = do
   return o
 {-# INLINE clone16 #-}
 
--- so we need to be able to quickly check if we differ on a higher nybble than the one
--- the word32s are the least and greatest keys possible in this node, not present
-
+-- | Build a singleton WordMap
 singleton :: Key -> v -> WordMap v
 singleton !k v = Tip k v
 {-# INLINE singleton #-}
@@ -231,3 +232,50 @@ fromList xs = foldl' (\r (k,v) -> insert k v r) Nil xs
 
 empty :: WordMap a
 empty = Nil
+{-# INLINE empty #-}
+
+{-
+zipWith16 :: (a -> b -> c) -> SmallArray a -> SmallArray b -> SmallArray c
+zipWith16 f i j = runST $ do
+  o <- newSmallArray 16 undefined
+  forM_ [0..15] $ \ p -> indexSmallArrayM i p >>= \a -> indexSmallArrayM j p >>= \b -> writeSmallArray o p (f a b)
+  unsafeFreezeSmallArray o
+{-# INLINE zipWith16 #-}
+
+keyShift :: WordMap v -> (Key, Int)
+keyShift (Tip k v)      = (k, 0)
+keyShift (Node k o _ _) = (k, o)
+keyShift (Full k o _ _) = (k, o)
+keyShift Nil            = (0, 0) -- undefined
+
+instance Monoid (WordMap v) where
+  mempty = Nil
+  mappend Nil m = m
+  mappend m Nil = m
+  mappend (Tip k v) m = insert k v m
+  mappend m (Tip k v)
+    | member k m = m
+    | otherwise = insert k v m
+  mappend l r
+    | i o'' > max o o' = fork o'' k l k' r
+    where
+      (lk,o)  = keyShift l
+      (rk,o') = keyShift r
+      o'' = level (xor lk rk)
+  mappend l@(Node k o m as) r@(Node k' o' m' bs) = compare o o' of
+    EQ | m'' <- m .|. m' -> node k o m'' $ do
+      r <- newSmallArray (popCount m'') undefined
+      forM_ [0..15] $ \p -> let t = unsafeShiftL 1 p in
+        guard (m .&. t /= 0) $ do
+          ...
+
+  mappend l@(Full k o as) r@(Full k' o' bs) = case compare o o' of
+    LT | p <- maskBit k' o -> Full k o $ update16 p (indexSmallArray as p `mappend` r) as
+    EQ -> Full k o $ do
+      r <- newSmallArray 16 undefined
+      forM_ [0..15] $ \ p -> indexSmallArrayM i p >>= \a -> indexSmallArrayM j p >>= \b -> writeSmallArray o r (f a b)
+      unsafeFreezeSmallArray r
+    GT | p <- maskBit k o' -> Full k o' $ update16 p (l `mappend` indexSmallArray bs p) bs
+
+  mappend (Node ok n m as) (Tip k v)
+-}
