@@ -140,6 +140,7 @@ instance Grouping Int16 where grouping = contramap fromIntegral groupingWord64
 instance Grouping Int32 where grouping = contramap fromIntegral groupingWord64
 instance Grouping Int64 where grouping = contramap fromIntegral groupingWord64
 instance Grouping Int where grouping = contramap fromIntegral groupingWord64
+instance Grouping Char where grouping = contramap (fromIntegral . fromEnum) groupingWord64
 
 instance Grouping Bool
 instance (Grouping a, Grouping b) => Grouping (a, b)

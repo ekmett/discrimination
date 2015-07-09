@@ -83,7 +83,7 @@ instance Divisible Sort where
 
 instance Decidable Sort where
   lose k = Sort $ fmap (absurd.k.fst)
-  choose f (Sort l) (Sort r) = Sort $ \xs -> let 
+  choose f (Sort l) (Sort r) = Sort $ \xs -> let
       ys = fmap (first f) xs
     in l [ (k,v) | (Left k, v) <- ys]
     ++ r [ (k,v) | (Right k, v) <- ys]
@@ -148,6 +148,11 @@ instance Sorting Int64 where
 
 instance Sorting Int where
   sorting = contramap (\x -> fromIntegral (x - minBound) :: Word) sorting
+
+instance Sorting Char where
+  sorting = Sort (runs <=< runSort (sortingNat 1087) . join . runSort (sortingNat 1024) . fmap radices) where
+    radices (c,b) = (x .&. 0x3ff, (unsafeShiftR x 10, (x,b))) where
+      x = fromEnum c
 
 -- TODO: Integer and Natural?
 
@@ -238,7 +243,7 @@ desc (Sort l) = Sort (reverse . l)
 sort :: Sorting a => [a] -> [a]
 sort as = List.concat $ runSort sorting [ (a,a) | a <- as ]
 
--- | /O(n)/. Sort a list with a Schwartzian transformation by using discrimination. 
+-- | /O(n)/. Sort a list with a Schwartzian transformation by using discrimination.
 --
 -- This linear time replacement for 'GHC.Exts.sortWith' and 'Data.List.sortOn' uses discrimination.
 sortWith :: Sorting b => (a -> b) -> [a] -> [a]
