@@ -1,19 +1,21 @@
-{-# LANGUAGE CPP, MagicHash, UnboxedTuples, DeriveDataTypeable, BangPatterns, TypeFamilies #-}
-
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+--------------------------------------------------------------------------------
 -- |
--- Module      : Data.Discrimination.Internal.SmallArray
 -- Copyright   : (c) Edward Kmett 2015
 -- License     : BSD-style
---
 -- Maintainer  : Edward Kmett <ekmett@gmail.com>
 -- Portability : non-portable
 --
 -- Small primitive boxed arrays
 --
-
+--------------------------------------------------------------------------------
 module Data.Discrimination.Internal.SmallArray (
   SmallArray(..), SmallMutableArray(..),
-
   newSmallArray, readSmallArray, writeSmallArray, indexSmallArray, indexSmallArrayM,
   unsafeFreezeSmallArray, unsafeThawSmallArray, sameSmallMutableArray,
   copySmallArray, copySmallMutableArray,
