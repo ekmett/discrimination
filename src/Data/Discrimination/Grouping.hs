@@ -39,7 +39,7 @@ import Data.Functor.Contravariant.Divisible
 import Data.Functor.Contravariant.Generic
 import Data.Hashable
 import Data.Int
-import Data.Monoid hiding (Any)
+import Data.Semigroup hiding (Any)
 import Data.Primitive.MutVar
 import Data.Promise
 import Data.Proxy
@@ -83,9 +83,12 @@ instance Decidable Group where
 
   lose k = Group $ \_ -> return (absurd . k)
 
+instance Semigroup (Group a) where
+  (<>) = divide (\a -> (a,a))
+
 instance Monoid (Group a) where
   mempty = conquer
-  mappend = divide (\a -> (a,a))
+  mappend = (<>)
 
 --------------------------------------------------------------------------------
 -- Primitives

@@ -50,8 +50,8 @@ import Data.IntMap.Lazy as IntMap
 import Data.IntSet as IntSet
 import qualified Data.List as List
 import Data.Map as Map
-import Data.Monoid hiding (Any)
 import Data.Proxy
+import Data.Semigroup hiding (Any)
 import Data.Set as Set
 import Data.Typeable
 import Data.Void
@@ -88,9 +88,12 @@ instance Decidable Sort where
     in l [ (k,v) | (Left k, v) <- ys]
     ++ r [ (k,v) | (Right k, v) <- ys]
 
+instance Semigroup (Sort a) where
+  Sort l <> Sort r = Sort $ \xs -> l [ (fst x, x) | x <- xs ] >>= r
+
 instance Monoid (Sort a) where
   mempty = conquer
-  mappend (Sort l) (Sort r) = Sort $ \xs -> l [ (fst x, x) | x <- xs ] >>= r
+  mappend = (<>)
 
 --------------------------------------------------------------------------------
 -- * Ordered Discrimination
