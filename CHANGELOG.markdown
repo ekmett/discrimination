@@ -1,3 +1,7 @@
+## 0.2
+
+* `grouping` is now much more efficient.
+
 ## 0.1
 
 * `grouping` is now productive. This means it can start spitting out results as it goes! To do this I created the `promises` package and switched to using it behind the scenes for many combinators that consume a `Group`. This has a bunch of knock-on effects:
