@@ -216,7 +216,7 @@ runGroup (Group m) xs = runLazy (\p0 -> do
 --
 -- This combinator still operates in linear time, at the expense of storing history.
 --
--- The result equivalence classes are _not_ sorted, but the grouping is stable.
+-- The result equivalence classes are __not__ sorted, but the grouping is stable.
 --
 -- @
 -- 'group' = 'groupWith' 'id'
@@ -226,7 +226,7 @@ group as = runGroup grouping [(a, a) | a <- as]
 
 -- | /O(n)/. This is a replacement for 'GHC.Exts.groupWith' using discrimination.
 --
--- The result equivalence classes are _not_ sorted, but the grouping is stable.
+-- The result equivalence classes are __not__ sorted, but the grouping is stable.
 groupWith :: Grouping b => (a -> b) -> [a] -> [[a]]
 groupWith f as = runGroup grouping [(f a, a) | a <- as]
 
