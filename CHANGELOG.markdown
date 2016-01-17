@@ -1,3 +1,11 @@
+## 0.2.1
+
+* `promises` 0.3 support
+* `vector` 0.11 support
+* `transformers` 0.5 support
+* `transformers-compat` support
+* ghc 8 support
+
 ## 0.2
 
 * `grouping` is now much more efficient.
