@@ -2,7 +2,7 @@ name:          discrimination
 category:      Data, Sorting
 version:       0.2.1
 license:       BSD3
-cabal-version: >= 1.22
+cabal-version: >= 1.10
 license-file:  LICENSE
 author:        Edward A. Kmett
 maintainer:    Edward A. Kmett <ekmett@gmail.com>
