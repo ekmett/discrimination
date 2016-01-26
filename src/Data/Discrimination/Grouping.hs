@@ -154,8 +154,14 @@ instance Grouping a => Grouping (Maybe a)
 instance (Grouping a, Grouping b) => Grouping (Either a b)
 instance Grouping a => Grouping (Complex a) where
   grouping = divide (\(a :+ b) -> (a, b)) grouping grouping
+
+#if __GLASGOW_HASKELL__ >= 800
+instance Grouping a => Grouping (Ratio a) where
+#else
 instance (Grouping a, Integral a) => Grouping (Ratio a) where
+#endif
   grouping = divide (\r -> (numerator r, denominator r)) grouping grouping
+
 instance (Grouping1 f, Grouping1 g, Grouping a) => Grouping (Compose f g a) where
   grouping = getCompose `contramap` grouping1 (grouping1 grouping)
 
