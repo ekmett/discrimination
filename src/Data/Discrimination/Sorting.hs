@@ -77,7 +77,7 @@ instance Contravariant Sort where
   contramap f (Sort g) = Sort $ g . fmap (first f)
 
 instance Divisible Sort where
-  conquer = Sort $ return . fmap snd
+  conquer = Sort $ \x -> take 1 x >> [fmap snd x]
   divide k (Sort l) (Sort r) = Sort $ \xs ->
     l [ (b, (c, d)) | (a,d) <- xs, let (b, c) = k a] >>= r
 
