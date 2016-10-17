@@ -69,6 +69,12 @@ import Prelude hiding (read, concat)
 newtype Sort a = Sort { runSort :: forall b. [(a,b)] -> [[b]] }
   deriving Typeable
 
+mkSort :: (forall b. [(a, b)] -> [[b]]) -> Sort a
+mkSort f = Sort $ \xs -> case xs of
+  []       -> []
+  [(_, v)] -> [[v]]
+  _        -> f xs
+
 #ifndef HLINT
 type role Sort representational
 #endif
@@ -77,13 +83,13 @@ instance Contravariant Sort where
   contramap f (Sort g) = Sort $ g . fmap (first f)
 
 instance Divisible Sort where
-  conquer = Sort $ \x -> take 1 x >> [fmap snd x]
+  conquer = mkSort $ return . fmap snd
   divide k (Sort l) (Sort r) = Sort $ \xs ->
     l [ (b, (c, d)) | (a,d) <- xs, let (b, c) = k a] >>= r
 
 instance Decidable Sort where
   lose k = Sort $ fmap (absurd.k.fst)
-  choose f (Sort l) (Sort r) = Sort $ \xs -> let
+  choose f (Sort l) (Sort r) = mkSort $ \xs -> let
       ys = fmap (first f) xs
     in l [ (k,v) | (Left k, v) <- ys]
     ++ r [ (k,v) | (Right k, v) <- ys]
@@ -196,7 +202,7 @@ sortingCompare a b = case runSort sorting [(a,LT),(b,GT)] of
 --------------------------------------------------------------------------------
 
 sortingNat :: Int -> Sort Int
-sortingNat n = Sort $ \xs -> List.filter (not . List.null) (bdiscNat n upd xs) where
+sortingNat n = mkSort $ \xs -> List.filter (not . List.null) (bdiscNat n upd xs) where
   upd vs v = v : vs
 {-# INLINE sortingNat #-}
 
