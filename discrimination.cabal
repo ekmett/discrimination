@@ -11,7 +11,7 @@ homepage:      http://github.com/ekmett/discrimination/
 bug-reports:   http://github.com/ekmett/discrimination/issues
 copyright:     Copyright (C) 2014-2015 Edward A. Kmett
 build-type:    Simple
-tested-with:   GHC == 7.10.1
+tested-with:   GHC == 7.10.3, GHC == 8.0.2, GHC == 8.2.1
 synopsis:      Fast generic linear-time sorting, joins and container construction.
 description:
   This package provides fast, generic, linear-time discrimination and sorting.
@@ -56,7 +56,7 @@ library
     semigroups    >= 0.16.2 && < 1,
     transformers  >= 0.2    && < 0.6,
     transformers-compat >= 0.3 && < 1,
-    vector        >= 0.10   && < 0.12,
+    vector        >= 0.10   && < 0.13,
     void          >= 0.5    && < 1
 
 benchmark wordmap
