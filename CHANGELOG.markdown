@@ -1,3 +1,7 @@
+## 0.3
+
+* Fixed a corner case where `conquer` would lie and return an empty equivalence class when fed no inputs.
+
 ## 0.2.1
 
 * `promises` 0.3 support

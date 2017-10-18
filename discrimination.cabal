@@ -1,6 +1,6 @@
 name:          discrimination
 category:      Data, Sorting
-version:       0.2.1
+version:       0.3
 license:       BSD3
 cabal-version: >= 1.10
 license-file:  LICENSE
