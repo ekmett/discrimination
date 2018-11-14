@@ -9,6 +9,7 @@
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# OPTIONS_GHC -fno-cse -fno-full-laziness #-}
 module Data.Discrimination.Sorting
   ( Sort(..)
@@ -56,6 +57,7 @@ import Data.Set as Set
 import Data.Typeable
 import Data.Void
 import Data.Word
+import Numeric.Natural
 import Prelude hiding (read, concat)
 
 --------------------------------------------------------------------------------
@@ -117,6 +119,15 @@ class Grouping a => Sorting a where
   default sorting :: Deciding Sorting a => Sort a
   sorting = deciding (Proxy :: Proxy Sorting) sorting
 #endif
+
+instance Sorting () where
+  sorting = conquer
+
+instance Sorting Integer where
+  sorting = contramap word8s sorting
+
+instance Sorting Natural where
+  sorting = contramap toInteger sorting
 
 instance Sorting Word8 where
   sorting = contramap fromIntegral (sortingNat 256)

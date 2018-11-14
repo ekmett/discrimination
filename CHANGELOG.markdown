@@ -1,3 +1,7 @@
+## 0.4
+
+* `Natural` and `Integer` discrimination
+
 ## 0.3
 
 * Fixed a corner case where `conquer` would lie and return an empty equivalence class when fed no inputs.
