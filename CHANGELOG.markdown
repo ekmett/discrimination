@@ -1,6 +1,6 @@
 ## 0.4
 
-* `Natural` and `Integer` discrimination
+* Added `Natural`, `Integer` and `()` discrimination
 
 ## 0.3
 
