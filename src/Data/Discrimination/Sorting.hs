@@ -57,7 +57,10 @@ import Data.Set as Set
 import Data.Typeable
 import Data.Void
 import Data.Word
-import Numeric.Natural
+import GHC.Integer.GMP.Internals
+import GHC.Natural
+import GHC.Word
+import GHC.Int
 import Prelude hiding (read, concat)
 
 --------------------------------------------------------------------------------
@@ -124,10 +127,17 @@ instance Sorting () where
   sorting = conquer
 
 instance Sorting Integer where
-  sorting = contramap word8s sorting
+  sorting = choose cases (desc sorting) (choose id sorting sorting) where
+    cases :: Integer -> Either (GmpSize,[GmpLimb]) (Either Int (GmpSize,[GmpLimb]))
+    cases (Jn# b) = Left          $ decomposeBigNat b
+    cases (S# i#) = Right . Left  $ I# i#
+    cases (Jp# b) = Right . Right $ decomposeBigNat b
 
 instance Sorting Natural where
-  sorting = contramap toInteger sorting
+  sorting = choose cases sorting sorting where
+    cases :: Natural -> Either GmpLimb (GmpSize,[GmpLimb])
+    cases (NatS# w#) = Left  $ W# w#
+    cases (NatJ# b)  = Right $ decomposeBigNat b
 
 instance Sorting Word8 where
   sorting = contramap fromIntegral (sortingNat 256)
@@ -173,8 +183,6 @@ instance Sorting Char where
   sorting = Sort (runs <=< runSort (sortingNat 1087) . join . runSort (sortingNat 1024) . fmap radices) where
     radices (c,b) = (x .&. 0x3ff, (unsafeShiftR x 10, (x,b))) where
       x = fromEnum c
-
--- TODO: Integer and Natural?
 
 instance Sorting Void
 instance Sorting Bool
