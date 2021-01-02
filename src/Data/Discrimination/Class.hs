@@ -20,7 +20,7 @@ class Decidable f => Discriminating f where
   disc :: f a -> [(a, b)] -> [[b]]
 
 instance Discriminating Sort where
-  disc = runSort
+  disc fa ab = runSort fa ab
 
 instance Discriminating Group where
   disc = runGroup

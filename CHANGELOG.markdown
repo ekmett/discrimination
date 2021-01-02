@@ -1,3 +1,7 @@
+## next
+
+* GHC-9.0 compatibility
+
 ## 0.4
 
 * Added `Natural`, `Integer` and `()` discrimination
