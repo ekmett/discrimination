@@ -1,7 +1,7 @@
 discrimination
 ==============
 
-[![Hackage](https://img.shields.io/hackage/v/discrimination.svg)](https://hackage.haskell.org/package/discrimination) [![Build Status](https://secure.travis-ci.org/ekmett/discrimination.png?branch=master)](http://travis-ci.org/ekmett/discrimination)
+[![Hackage](https://img.shields.io/hackage/v/discrimination.svg)](https://hackage.haskell.org/package/discrimination) [![Build Status](https://github.com/ekmett/discrimination/workflows/Haskell-CI/badge.svg)](https://github.com/ekmett/discrimination/actions?query=workflow%3AHaskell-CI)
 
 This package provides linear time sorting, partitioning, and joins for a wide array of Haskell data types. This work is based on a
 "final encoding" of the ideas presented in [multiple](http://hjemmesider.diku.dk/~henglein/papers/henglein2011a.pdf) [papers](http://hjemmesider.diku.dk/~henglein/papers/henglein2011c.pdf) and [talks](https://www.youtube.com/watch?v=sz9ZlZIRDAg) by [Fritz Henglein](http://hjemmesider.diku.dk/~henglein).
