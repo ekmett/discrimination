@@ -30,6 +30,7 @@ import Data.Complex
 import Data.Discrimination.Internal.WordMap as WordMap
 import Data.Discrimination.Internal
 import Data.Foldable hiding (concat)
+import Data.Functor.Classes (Eq1 (..))
 import Data.Functor.Compose
 import Data.Functor.Contravariant
 import Data.Functor.Contravariant.Divisible
@@ -48,6 +49,8 @@ import Data.Word
 import Numeric.Natural (Natural)
 import Prelude hiding (read, concat, mapM_)
 
+import Data.Orphans ()
+
 -- | Productive Stable Unordered Discriminator
 
 newtype Group a = Group
@@ -60,6 +63,7 @@ newtype Group a = Group
 --     type role Group representational
 --
 -- but it isn't due PrimMonad not implying higher-order Coercible constraint.
+type role Group nominal
 
 instance Contravariant Group where
   contramap f m = Group $ \k -> do
@@ -129,9 +133,7 @@ hashing = contramap hash grouping
 -- 'groupingEq' x y ≡ (x '==' y)
 -- @
 --
--- /Note:/ 'Eq' is a moral super class of 'Grouping'.
--- It isn't because of some missing instances.
-class Grouping a where
+class Eq a => Grouping a where
   -- | For every surjection @f@,
   --
   -- @
@@ -184,7 +186,7 @@ instance (Grouping a, Integral a) => Grouping (Ratio a) where
 instance (Grouping1 f, Grouping1 g, Grouping a) => Grouping (Compose f g a) where
   grouping = getCompose `contramap` grouping1 (grouping1 grouping)
 
-class Grouping1 f where
+class Eq1 f => Grouping1 f where
   grouping1 :: Group a -> Group (f a)
   default grouping1 :: Deciding1 Grouping f => Group a -> Group (f a)
   grouping1 = deciding1 (Proxy :: Proxy Grouping) grouping
@@ -280,4 +282,3 @@ nubWith f xs = runLazy (\p0 -> do
       return $ \ _ -> return ()
     mapM_ (\x -> k (f x) x) xs
   ) []
-

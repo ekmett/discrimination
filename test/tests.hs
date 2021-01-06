@@ -135,13 +135,13 @@ instance Arbitrary a => Arbitrary (SmallList a) where
     shrink = fmap SmallList . shrink . getSmallList
 
 testGrouping
-  :: forall a. (Grouping a, Typeable a, Arbitrary a, Eq a, Show a)
+  :: forall a. (Grouping a, Typeable a, Arbitrary a, Show a)
   => Proxy a
   -> TestTree
 testGrouping _ = testGrouping' (id :: a -> a)
 
 testGrouping'
-  :: forall a b. (Grouping b, Typeable a, Typeable b, Arbitrary a, Eq b, Show a, Show b)
+  :: forall a b. (Grouping b, Typeable a, Typeable b, Arbitrary a, Show a, Show b)
   => (a -> b)
   -> TestTree
 testGrouping' f = testGroup name
@@ -169,13 +169,13 @@ testGrouping' f = testGroup name
         xs = take 100 (map f xs')
 
 testSorting
-  :: forall a. (Sorting a, Typeable a, Arbitrary a, Ord a, Show a)
+  :: forall a. (Sorting a, Typeable a, Arbitrary a, Show a)
   => Proxy a
   -> TestTree
 testSorting _ = testSorting' (id :: a -> a)
 
 testSorting'
-  :: forall a b. (Sorting b, Typeable a, Typeable b, Arbitrary a, Ord b, Show a, Show b)
+  :: forall a b. (Sorting b, Typeable a, Typeable b, Arbitrary a, Show a, Show b)
   => (a -> b)
   -> TestTree
 testSorting' f = testGroup name

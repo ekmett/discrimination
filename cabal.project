@@ -1,1 +1,6 @@
 packages: .
+
+source-repository-package
+  type:     git
+  location: https://github.com/haskell-compat/base-orphans.git
+  tag:      dee81a73ccc975086ae045ed1d2c3f6283141823

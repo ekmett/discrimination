@@ -1,3 +1,4 @@
+distribution:           bionic
 branches:               master
 hlint:                  True
 hlint-yaml:             .hlint.yaml
