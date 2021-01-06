@@ -150,10 +150,10 @@ instance Sorting Word where
     | otherwise                        = contramap (fromIntegral :: Word -> Word64) sorting
 
 instance Sorting Int8 where
-  sorting = contramap (\x -> fromIntegral (x - minBound)) (sortingNat 256)
+  sorting = contramap (\x -> fromIntegral x + 128) (sortingNat 256)
 
 instance Sorting Int16 where
-  sorting = contramap (\x -> fromIntegral (x - minBound)) (sortingNat 65536)
+  sorting = contramap (\x -> fromIntegral x + 32768) (sortingNat 65536)
 
 instance Sorting Int32 where
   sorting = contramap (\x -> fromIntegral (x - minBound) :: Word32) sorting
@@ -173,6 +173,7 @@ instance Sorting Char where
 
 instance Sorting Void
 instance Sorting Bool
+instance Sorting Ordering
 instance Sorting a => Sorting [a]
 instance Sorting a => Sorting (Maybe a)
 instance (Sorting a, Sorting b) => Sorting (Either a b)
