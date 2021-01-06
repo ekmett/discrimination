@@ -1,6 +1,5 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE RoleAnnotations #-}
@@ -22,7 +21,6 @@ module Data.Discrimination.Grouping
   , runGroup
   -- * Internals
   , hashing
-  , decomposeBigNat
   ) where
 
 import Control.Monad hiding (mapM_)
@@ -30,6 +28,7 @@ import Control.Monad.Primitive
 import Control.Monad.ST
 import Data.Complex
 import Data.Discrimination.Internal.WordMap as WordMap
+import Data.Discrimination.Internal
 import Data.Foldable hiding (concat)
 import Data.Functor.Compose
 import Data.Functor.Contravariant
@@ -40,17 +39,13 @@ import Data.Int
 import Data.List.NonEmpty (NonEmpty)
 import Data.Semigroup hiding (Any)
 import Data.Primitive.MutVar
-import Data.Primitive.PrimArray
 import Data.Promise
 import Data.Proxy
 import Data.Ratio
 import Data.Typeable
 import Data.Void
 import Data.Word
-import GHC.Integer.GMP.Internals
-import GHC.Natural
-import GHC.Word
-import GHC.Int
+import Numeric.Natural (Natural)
 import Prelude hiding (read, concat, mapM_)
 
 -- | Productive Stable Unordered Discriminator
@@ -161,20 +156,10 @@ instance Grouping a => Grouping (Complex a) where
   grouping = divide (\(a :+ b) -> (a, b)) grouping grouping
 
 instance Grouping Integer where
-  grouping = choose cases grouping (choose id grouping grouping) where
-    cases :: Integer -> Either Int (Either (GmpSize,[GmpLimb]) (GmpSize,[GmpLimb]))
-    cases (S# i#) = Left          $ I# i#
-    cases (Jp# b) = Right . Left  $ decomposeBigNat b
-    cases (Jn# b) = Right . Right $ decomposeBigNat b
+  grouping = choose integerCases grouping (choose id grouping grouping)
 
 instance Grouping Natural where
-  grouping = choose cases grouping grouping where
-    cases :: Natural -> Either GmpLimb (GmpSize,[GmpLimb])
-    cases (NatS# w#) = Left  $ W# w#
-    cases (NatJ# b)  = Right $ decomposeBigNat b
-
-decomposeBigNat :: BigNat -> (GmpSize, [GmpLimb])
-decomposeBigNat (BN# ba#) = let pa = PrimArray ba# in (sizeofPrimArray pa, primArrayToList pa)
+  grouping = choose naturalCases grouping grouping
 
 #if __GLASGOW_HASKELL__ >= 800
 instance Grouping a => Grouping (Ratio a) where

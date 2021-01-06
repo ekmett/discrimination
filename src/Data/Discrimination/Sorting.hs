@@ -5,7 +5,6 @@
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE MonoLocalBinds #-}
-{-# LANGUAGE MagicHash #-}
 {-# OPTIONS_GHC -fno-cse -fno-full-laziness #-}
 module Data.Discrimination.Sorting
   ( Sort(..)
@@ -54,10 +53,7 @@ import Data.Set as Set
 import Data.Typeable
 import Data.Void
 import Data.Word
-import GHC.Integer.GMP.Internals
-import GHC.Natural
-import GHC.Word
-import GHC.Int
+import Numeric.Natural (Natural)
 import Prelude hiding (read, concat)
 
 --------------------------------------------------------------------------------
@@ -124,17 +120,10 @@ instance Sorting () where
   sorting = conquer
 
 instance Sorting Integer where
-  sorting = choose cases (desc sorting) (choose id sorting sorting) where
-    cases :: Integer -> Either (GmpSize,[GmpLimb]) (Either Int (GmpSize,[GmpLimb]))
-    cases (Jn# b) = Left          $ decomposeBigNat b
-    cases (S# i#) = Right . Left  $ I# i#
-    cases (Jp# b) = Right . Right $ decomposeBigNat b
+  sorting = choose integerCases (desc sorting) (choose id sorting sorting)
 
 instance Sorting Natural where
-  sorting = choose cases sorting sorting where
-    cases :: Natural -> Either GmpLimb (GmpSize,[GmpLimb])
-    cases (NatS# w#) = Left  $ W# w#
-    cases (NatJ# b)  = Right $ decomposeBigNat b
+  sorting = choose naturalCases sorting sorting
 
 instance Sorting Word8 where
   sorting = contramap fromIntegral (sortingNat 256)

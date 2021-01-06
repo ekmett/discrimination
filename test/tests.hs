@@ -8,7 +8,8 @@ import Data.Proxy (Proxy (..))
 import Data.Typeable (Typeable, typeRep)
 import Data.Word (Word8, Word16, Word32, Word64)
 import Numeric.Natural (Natural)
-import Test.QuickCheck (Arbitrary, Property, label, (===))
+import Test.QuickCheck (Arbitrary (..), Property, counterexample, label, (===),
+                        sized, chooseInt, vectorOf)
 import Test.QuickCheck.Instances ()
 import Test.Tasty (defaultMain, testGroup, TestTree)
 import Test.Tasty.QuickCheck (testProperty)
@@ -54,7 +55,6 @@ main = defaultMain $ testGroup "discrimination"
         let prop :: [Word64] -> Property
             prop xs = mergesort xs === sort xs
         in prop
-
       ]
     ]
 
@@ -81,8 +81,11 @@ main = defaultMain $ testGroup "discrimination"
     , testGrouping (Proxy :: Proxy Char)
     , testGrouping (Proxy :: Proxy String)
     , testGrouping (Proxy :: Proxy (NonEmpty Int))
-    -- , testGrouping (Proxy :: Proxy Natural) -- broken!
-    -- , testGrouping (Proxy :: Proxy Integer) -- broken!
+    , testGrouping (Proxy :: Proxy Natural)
+    , testGrouping (Proxy :: Proxy Integer)
+
+    , testGrouping' listToNatural
+    , testGrouping' listToInteger
     ]
 
   , testGroup "Sorting"
@@ -107,31 +110,93 @@ main = defaultMain $ testGroup "discrimination"
     , testSorting (Proxy :: Proxy Char)
     , testSorting (Proxy :: Proxy String)
     , testSorting (Proxy :: Proxy (NonEmpty Int))
+    , testSorting (Proxy :: Proxy Natural)
+    , testSorting (Proxy :: Proxy Integer)
+
+    , testSorting' listToNatural
+    , testSorting' listToInteger
     ]
   ]
+
+listToNatural :: SmallList Word64 -> Natural
+listToNatural = L.foldl' (\x y -> x * 2 ^ (64 :: Int) + fromIntegral y) 0 . getSmallList
+
+listToInteger :: SmallList Int64 -> Integer
+listToInteger = L.foldl' (\x y -> x * 2 ^ (64 :: Int) + fromIntegral y) 0 . getSmallList
+
+newtype SmallList a = SmallList { getSmallList :: [a] } deriving (Eq, Show)
+
+instance Arbitrary a => Arbitrary (SmallList a) where
+    arbitrary = sized $ \n -> do
+        m <- chooseInt (0, min 10 n)
+        SmallList <$> vectorOf m arbitrary
+
+    shrink = fmap SmallList . shrink . getSmallList
 
 testGrouping
   :: forall a. (Grouping a, Typeable a, Arbitrary a, Eq a, Show a)
   => Proxy a
   -> TestTree
-testGrouping p = testProperty name prop
-  where
-    name = show (typeRep p)
+testGrouping _ = testGrouping' (id :: a -> a)
 
-    prop :: a -> a -> Property
-    prop x y = label (show lhs) $ lhs === groupingEq x y
+testGrouping'
+  :: forall a b. (Grouping b, Typeable a, Typeable b, Arbitrary a, Eq b, Show a, Show b)
+  => (a -> b)
+  -> TestTree
+testGrouping' f = testGroup name
+    [ testProperty "groupingEq" prop_eq
+    , testProperty "nub"        prop_nub
+    ]
+  where
+    tra = typeRep (Proxy :: Proxy a)
+    trb = typeRep (Proxy :: Proxy b)
+    name = if tra == trb then show tra else show trb ++ " from " ++ show tra
+
+    prop_eq :: a -> a -> Property
+    prop_eq x' y' =
+        counterexample (show (x,y)) $
+        label (show lhs) $
+        lhs === groupingEq x y
       where
+        x = f x'
+        y = f y'
         lhs = x == y
+
+    prop_nub :: [a] -> Property
+    prop_nub xs' = L.nub xs === nub xs
+      where
+        xs = take 100 (map f xs')
 
 testSorting
   :: forall a. (Sorting a, Typeable a, Arbitrary a, Ord a, Show a)
   => Proxy a
   -> TestTree
-testSorting p = testProperty name prop
-  where
-    name = show (typeRep p)
+testSorting _ = testSorting' (id :: a -> a)
 
-    prop :: a -> a -> Property
-    prop x y = label (show lhs) $ lhs === sortingCompare x y
+testSorting'
+  :: forall a b. (Sorting b, Typeable a, Typeable b, Arbitrary a, Ord b, Show a, Show b)
+  => (a -> b)
+  -> TestTree
+testSorting' f = testGroup name
+    [ testProperty "sortingCompare" prop_cmp
+    , testProperty "sort"           prop_sort
+    ]
+  where
+    tra = typeRep (Proxy :: Proxy a)
+    trb = typeRep (Proxy :: Proxy b)
+    name = if tra == trb then show tra else show trb ++ " from " ++ show tra
+
+    prop_cmp :: a -> a -> Property
+    prop_cmp x' y' =
+        counterexample (show (x,y)) $
+        label (show lhs) $
+        lhs === sortingCompare x y
       where
+        x = f x'
+        y = f y'
         lhs = compare x y
+
+    prop_sort :: [a] -> Property
+    prop_sort xs' = L.sort xs === sort xs
+      where
+        xs = map f xs'
