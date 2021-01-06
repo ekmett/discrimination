@@ -22,7 +22,6 @@ extra-source-files:
   .gitignore
   README.markdown
   CHANGELOG.markdown
-  HLint.hs
 
 source-repository head
   type: git
