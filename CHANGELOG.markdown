@@ -1,6 +1,8 @@
 ## next
 
 * GHC-9.0 compatibility
+* Added `Ordering` discrimination
+* Fix `Sorting Int8` and `Sorting Int16` instances
 
 ## 0.4
 

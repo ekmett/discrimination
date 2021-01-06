@@ -194,6 +194,9 @@ jobs:
       - name: build
         run: |
           $CABAL v2-build $ARG_COMPILER $ARG_TESTS $ARG_BENCH all --write-ghc-environment-files=always
+      - name: tests
+        run: |
+          $CABAL v2-test $ARG_COMPILER $ARG_TESTS $ARG_BENCH all --test-show-details=direct
       - name: hlint
         run: |
           if [ $((HCNUMVER >= 81000)) -ne 0 ] ; then (cd ${PKGDIR_discrimination} && hlint -h ${GITHUB_WORKSPACE}/source/.hlint.yaml src) ; fi

@@ -59,6 +59,29 @@ library
     vector        >= 0.10   && < 0.13,
     void          >= 0.5    && < 1
 
+test-suite properties
+  type:             exitcode-stdio-1.0
+  main-is:          tests.hs
+  other-modules:    Utils
+  ghc-options:      -Wall -O2 -threaded
+  hs-source-dirs:   test common
+  default-language: Haskell2010
+  build-depends:
+    base >= 4.8,
+    containers,
+    criterion,
+    deepseq,
+    discrimination,
+    hashable,
+    QuickCheck >=2.14.2,
+    quickcheck-instances,
+    splitmix >=0.1 && <0.2,
+    tasty,
+    tasty-quickcheck,
+    unordered-containers,
+    vector,
+    vector-algorithms
+
 benchmark wordmap
   type:             exitcode-stdio-1.0
   main-is:          wordmap.hs
@@ -80,7 +103,7 @@ benchmark examples
   main-is:          examples.hs
   other-modules:    Utils
   ghc-options:      -Wall -O2 -threaded
-  hs-source-dirs:   benchmarks
+  hs-source-dirs:   benchmarks common
   default-language: Haskell2010
   build-depends:
     base >= 4.8,
