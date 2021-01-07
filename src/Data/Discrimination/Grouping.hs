@@ -55,6 +55,12 @@ newtype Group a = Group
              => (b -> m (b -> m ())) -> m (a -> b -> m ())
   } deriving Typeable
 
+-- Note: Group should be
+--
+--     type role Group representational
+--
+-- but it isn't due PrimMonad not implying higher-order Coercible constraint.
+
 instance Contravariant Group where
   contramap f m = Group $ \k -> do
     g <- getGroup m k
@@ -116,6 +122,15 @@ hashing = contramap hash grouping
 --------------------------------------------------------------------------------
 
 -- | 'Eq' equipped with a compatible stable unordered discriminator.
+--
+-- Law:
+--
+-- @
+-- 'groupingEq' x y ≡ (x '==' y)
+-- @
+--
+-- /Note:/ 'Eq' is a moral super class of 'Grouping'.
+-- It isn't because of some missing instances.
 class Grouping a where
   -- | For every surjection @f@,
   --
@@ -124,10 +139,8 @@ class Grouping a where
   -- @
 
   grouping :: Group a
-#ifndef HLINT
   default grouping :: Deciding Grouping a => Group a
   grouping = deciding (Proxy :: Proxy Grouping) grouping
-#endif
 
 instance Grouping Void where grouping = lose id
 instance Grouping () where grouping = conquer
@@ -173,10 +186,8 @@ instance (Grouping1 f, Grouping1 g, Grouping a) => Grouping (Compose f g a) wher
 
 class Grouping1 f where
   grouping1 :: Group a -> Group (f a)
-#ifndef HLINT
   default grouping1 :: Deciding1 Grouping f => Group a -> Group (f a)
   grouping1 = deciding1 (Proxy :: Proxy Grouping) grouping
-#endif
 
 instance Grouping1 []
 instance Grouping1 Maybe
