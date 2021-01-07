@@ -56,6 +56,10 @@ import Data.Word
 import Numeric.Natural (Natural)
 import Prelude hiding (read, concat)
 
+-- $setup
+-- >>> import qualified Data.Map as Map
+-- >>> import qualified Data.IntMap as IntMap
+
 --------------------------------------------------------------------------------
 -- * Common
 --------------------------------------------------------------------------------
@@ -274,14 +278,21 @@ sortWith f as = List.concat $ runSort sorting [ (f a, a) | a <- as ]
 --
 -- This is an asymptotically faster version of 'Data.Map.fromList', which exploits ordered discrimination.
 --
--- >>> toMap [] == empty
--- True
+-- >>> toMap []
+-- fromList []
 --
 -- >>> toMap [(5,"a"), (3 :: Int,"b"), (5, "c")]
--- fromList [(5,"c"), (3,"b")]
+-- fromList [(3,"b"),(5,"c")]
+--
+-- >>> Map.fromList [(5,"a"), (3 :: Int,"b"), (5, "c")]
+-- fromList [(3,"b"),(5,"c")]
 --
 -- >>> toMap [(5,"c"), (3,"b"), (5 :: Int, "a")]
--- fromList [(5,"a"), (3,"b")]
+-- fromList [(3,"b"),(5,"a")]
+--
+-- >>> Map.fromList [(5,"c"), (3,"b"), (5 :: Int, "a")]
+-- fromList [(3,"b"),(5,"a")]
+--
 toMap :: Sorting k => [(k, v)] -> Map k v
 toMap kvs = Map.fromDistinctAscList $ last <$> runSort sorting [ (fst kv, kv) | kv <- kvs ]
 
@@ -292,10 +303,13 @@ toMap kvs = Map.fromDistinctAscList $ last <$> runSort sorting [ (fst kv, kv) | 
 -- (Note: values combine in anti-stable order for compatibility with 'Data.Map.fromListWith')
 --
 -- >>> toMapWith (++) [(5,"a"), (5,"b"), (3,"b"), (3,"a"), (5 :: Int,"c")]
--- fromList [(3, "ab"), (5, "cba")]
+-- fromList [(3,"ab"),(5,"cba")]
 --
--- >>> toMapWith (++) [] == empty
--- True
+-- >>> Map.fromListWith (++) [(5,"a"), (5,"b"), (3,"b"), (3,"a"), (5 :: Int,"c")]
+-- fromList [(3,"ab"),(5,"cba")]
+--
+-- >>> toMapWith (++) []
+-- fromList []
 toMapWith :: Sorting k => (v -> v -> v) -> [(k, v)] -> Map k v
 toMapWith f kvs0 = Map.fromDistinctAscList $ go <$> runSort sorting [ (fst kv, kv) | kv <- kvs0 ] where
   go ((k,v):kvs) = (k, Prelude.foldl (flip (f . snd)) v kvs)
@@ -309,10 +323,10 @@ toMapWith f kvs0 = Map.fromDistinctAscList $ go <$> runSort sorting [ (fst kv, k
 --
 -- >>> let f key new_value old_value = show key ++ ":" ++ new_value ++ "|" ++ old_value
 -- >>> toMapWithKey f [(5,"a"), (5,"b"), (3,"b"), (3,"a"), (5 :: Int,"c")]
--- fromList [(3, "3:a|b"), (5, "5:c|5:b|a")]
+-- fromList [(3,"3:a|b"),(5,"5:c|5:b|a")]
 --
--- >>> toMapWithKey f [] == empty
--- True
+-- >>> toMapWithKey f []
+-- fromList []
 toMapWithKey :: Sorting k => (k -> v -> v -> v) -> [(k, v)] -> Map k v
 toMapWithKey f kvs0 = Map.fromDistinctAscList $ go <$> runSort sorting [ (fst kv, kv) | kv <- kvs0 ] where
   go ((k,v):kvs) = (k, Prelude.foldl (flip (f k . snd)) v kvs)
@@ -320,14 +334,21 @@ toMapWithKey f kvs0 = Map.fromDistinctAscList $ go <$> runSort sorting [ (fst kv
 
 -- | /O(n)/. Construct an 'IntMap'.
 --
--- >>> toIntMap [] == empty
--- True
+-- >>> toIntMap []
+-- fromList []
 --
 -- >>> toIntMap [(5,"a"), (3,"b"), (5, "c")]
--- fromList [(5,"c"), (3,"b")]
+-- fromList [(3,"b"),(5,"c")]
+--
+-- >>> IntMap.fromList [(5,"a"), (3,"b"), (5, "c")]
+-- fromList [(3,"b"),(5,"c")]
 --
 -- >>> toIntMap [(5,"c"), (3,"b"), (5, "a")]
--- fromList [(5,"a"), (3,"b")]
+-- fromList [(3,"b"),(5,"a")]
+--
+-- >>> IntMap.fromList [(5,"c"), (3,"b"), (5, "a")]
+-- fromList [(3,"b"),(5,"a")]
+--
 toIntMap :: [(Int, v)] -> IntMap v
 toIntMap kvs = IntMap.fromDistinctAscList $ last <$> runSort sorting [ (fst kv, kv) | kv <- kvs ]
 
@@ -338,10 +359,13 @@ toIntMap kvs = IntMap.fromDistinctAscList $ last <$> runSort sorting [ (fst kv, 
 -- (Note: values combine in anti-stable order for compatibility with 'Data.IntMap.Lazy.fromListWith')
 --
 -- >>> toIntMapWith (++) [(5,"a"), (5,"b"), (3,"b"), (3,"a"), (5,"c")]
--- fromList [(3, "ab"), (5, "cba")]
+-- fromList [(3,"ab"),(5,"cba")]
 --
--- >>> toIntMapWith (++) [] == empty
--- True
+-- >>> IntMap.fromListWith (++) [(5,"a"), (5,"b"), (3,"b"), (3,"a"), (5,"c")]
+-- fromList [(3,"ab"),(5,"cba")]
+--
+-- >>> toIntMapWith (++) []
+-- fromList []
 toIntMapWith :: (v -> v -> v) -> [(Int, v)] -> IntMap v
 toIntMapWith f kvs0 = IntMap.fromDistinctAscList $ go <$> runSort sorting [ (fst kv, kv) | kv <- kvs0 ] where
   go ((k,v):kvs) = (k, Prelude.foldl (flip (f . snd)) v kvs)
@@ -355,10 +379,13 @@ toIntMapWith f kvs0 = IntMap.fromDistinctAscList $ go <$> runSort sorting [ (fst
 --
 -- >>> let f key new_value old_value = show key ++ ":" ++ new_value ++ "|" ++ old_value
 -- >>> toIntMapWithKey f [(5,"a"), (5,"b"), (3,"b"), (3,"a"), (5,"c")]
--- fromList [(3, "3:a|b"), (5, "5:c|5:b|a")]
+-- fromList [(3,"3:a|b"),(5,"5:c|5:b|a")]
 --
--- >>> toIntMapWithKey f [] == empty
--- True
+-- >>> IntMap.fromListWithKey f [(5,"a"), (5,"b"), (3,"b"), (3,"a"), (5,"c")]
+-- fromList [(3,"3:a|b"),(5,"5:c|5:b|a")]
+--
+-- >>> toIntMapWithKey f []
+-- fromList []
 toIntMapWithKey :: (Int -> v -> v -> v) -> [(Int, v)] -> IntMap v
 toIntMapWithKey f kvs0 = IntMap.fromDistinctAscList $ go <$> runSort sorting [ (fst kv, kv) | kv <- kvs0 ] where
   go ((k,v):kvs) = (k, Prelude.foldl (flip (f k . snd)) v kvs)
