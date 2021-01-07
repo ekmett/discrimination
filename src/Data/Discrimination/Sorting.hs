@@ -45,6 +45,7 @@ import Data.Int
 import Data.IntMap.Lazy as IntMap
 import Data.IntSet as IntSet
 import qualified Data.List as List
+import Data.List.NonEmpty (NonEmpty)
 import Data.Map as Map
 import Data.Proxy
 import Data.Semigroup hiding (Any)
@@ -175,6 +176,7 @@ instance Sorting Void
 instance Sorting Bool
 instance Sorting Ordering
 instance Sorting a => Sorting [a]
+instance Sorting a => Sorting (NonEmpty a)
 instance Sorting a => Sorting (Maybe a)
 instance (Sorting a, Sorting b) => Sorting (Either a b)
 instance (Sorting a, Sorting b) => Sorting (a, b)
@@ -194,6 +196,7 @@ instance (Sorting1 f, Sorting1 g) => Sorting1 (Compose f g) where
   sorting1 f = getCompose `contramap` sorting1 (sorting1 f)
 
 instance Sorting1 []
+instance Sorting1 NonEmpty
 instance Sorting1 Maybe
 instance Sorting a => Sorting1 (Either a)
 

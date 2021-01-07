@@ -3,6 +3,7 @@ module Main (main) where
 
 import Data.Complex (Complex)
 import Data.Int (Int8, Int16, Int32, Int64)
+import Data.List.NonEmpty (NonEmpty)
 import Data.Proxy (Proxy (..))
 import Data.Typeable (Typeable, typeRep)
 import Data.Word (Word8, Word16, Word32, Word64)
@@ -79,6 +80,7 @@ main = defaultMain $ testGroup "discrimination"
     , testGrouping (Proxy :: Proxy (Either Word8 Word8))
     , testGrouping (Proxy :: Proxy Char)
     , testGrouping (Proxy :: Proxy String)
+    , testGrouping (Proxy :: Proxy (NonEmpty Int))
     -- , testGrouping (Proxy :: Proxy Natural) -- broken!
     -- , testGrouping (Proxy :: Proxy Integer) -- broken!
     ]
@@ -104,6 +106,7 @@ main = defaultMain $ testGroup "discrimination"
     , testSorting (Proxy :: Proxy (Either Word8 Word8))
     , testSorting (Proxy :: Proxy Char)
     , testSorting (Proxy :: Proxy String)
+    , testSorting (Proxy :: Proxy (NonEmpty Int))
     ]
   ]
 
