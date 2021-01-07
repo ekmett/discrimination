@@ -38,6 +38,7 @@ import Data.Functor.Contravariant.Divisible
 import Data.Functor.Contravariant.Generic
 import Data.Hashable
 import Data.Int
+import Data.List.NonEmpty (NonEmpty)
 import Data.Semigroup hiding (Any)
 import Data.Primitive.MutVar
 import Data.Primitive.PrimArray
@@ -153,6 +154,7 @@ instance (Grouping a, Grouping b) => Grouping (a, b)
 instance (Grouping a, Grouping b, Grouping c) => Grouping (a, b, c)
 instance (Grouping a, Grouping b, Grouping c, Grouping d) => Grouping (a, b, c, d)
 instance Grouping a => Grouping [a]
+instance Grouping a => Grouping (NonEmpty a)
 instance Grouping a => Grouping (Maybe a)
 instance (Grouping a, Grouping b) => Grouping (Either a b)
 instance Grouping a => Grouping (Complex a) where
@@ -188,6 +190,7 @@ class Grouping1 f where
 
 instance Grouping1 []
 instance Grouping1 Maybe
+instance Grouping1 NonEmpty
 instance Grouping a => Grouping1 (Either a)
 instance Grouping a => Grouping1 ((,) a)
 instance (Grouping a, Grouping b) => Grouping1 ((,,) a b)

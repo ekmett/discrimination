@@ -53,8 +53,10 @@ library
     primitive     >= 0.7.1.0 && < 0.8,
     profunctors   >= 5.6.1   && < 6,
     promises      >= 0.3     && < 0.4,
-    semigroups    >= 0.18.5  && < 1,
     transformers  >= 0.4.2.0 && < 0.6
+
+  if !impl(ghc >=8.0)
+    build-depends: semigroups >= 0.18.5 && < 1
 
 test-suite properties
   type:             exitcode-stdio-1.0
@@ -78,6 +80,9 @@ test-suite properties
     unordered-containers,
     vector,
     vector-algorithms
+
+  if !impl(ghc >=8.0)
+    build-depends: semigroups
 
 benchmark wordmap
   type:             exitcode-stdio-1.0
