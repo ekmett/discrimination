@@ -49,7 +49,6 @@ library
     deepseq       >= 1.4.1.1 && < 1.5,
     ghc-prim,
     hashable      >= 1.2.7.0 && < 1.4,
-    integer-gmp   >= 1.0     && < 1.1,
     primitive     >= 0.7.1.0 && < 0.8,
     profunctors   >= 5.6.1   && < 6,
     promises      >= 0.3     && < 0.4,
@@ -57,6 +56,11 @@ library
 
   if !impl(ghc >=8.0)
     build-depends: semigroups >= 0.18.5 && < 1
+
+  if impl(ghc >= 9.0)
+    build-depends: ghc-bignum >= 1.0 && < 1.1
+  else
+    build-depends: integer-gmp >= 1.0 && < 1.1
 
 test-suite properties
   type:             exitcode-stdio-1.0

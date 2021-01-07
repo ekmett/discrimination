@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ParallelListComp #-}
 {-# LANGUAGE MagicHash #-}
@@ -18,12 +19,18 @@ import Data.Int
 import qualified Data.List as List
 import Prelude hiding (read, concat)
 
-import GHC.Natural
-import GHC.Integer.GMP.Internals
 import GHC.Word
 import GHC.Exts
 import Data.Primitive.Types (Prim)
 import Data.Primitive.PrimArray
+
+#ifdef MIN_VERSION_ghc_bignum
+import GHC.Num.Integer
+import GHC.Num.Natural
+#else
+import GHC.Natural
+import GHC.Integer.GMP.Internals
+#endif
 
 --------------------------------------------------------------------------------
 -- * Utilities
@@ -70,21 +77,37 @@ fromRight _ = error "unstable discriminator"
 -- * Integer and Natural
 -------------------------------------------------------------------------------
 
-integerCases :: Integer -> Either (GmpSize,[GmpLimb]) (Either Int (GmpSize,[GmpLimb]))
+integerCases :: Integer -> Either (Int,[Word]) (Either Int (Int,[Word]))
+#ifdef MIN_VERSION_ghc_bignum
+integerCases (IN b) = Left          $ decomposeBigNat b
+integerCases (IS i) = Right . Left  $ I# i
+integerCases (IP b) = Right . Right $ decomposeBigNat b
+#else
 integerCases (Jn# b) = Left          $ decomposeBigNat b
 integerCases (S#  i) = Right . Left  $ I# i
 integerCases (Jp# b) = Right . Right $ decomposeBigNat b
+#endif
 {-# INLINE integerCases #-}
 
-naturalCases :: Natural -> Either GmpLimb (GmpSize,[GmpLimb])
+naturalCases :: Natural -> Either Word (Int,[Word])
+#ifdef MIN_VERSION_ghc_bignum
+naturalCases (NS w) = Left $ W# w
+naturalCases (NB b) = Right $ decomposeBigNat b
+#else
 naturalCases (NatS# w) = Left $ W# w
 naturalCases (NatJ# b) = Right $ decomposeBigNat b
+#endif
 {-# INLINE naturalCases #-}
 
 -- We need to reverse the limb array. Its stored least-significant word first
 -- but for comparasion to work right we need most-significant words first.
-decomposeBigNat :: BigNat -> (GmpSize, [GmpLimb])
+#ifdef MIN_VERSION_ghc_bignum
+decomposeBigNat :: ByteArray# -> (Int, [Word])
+decomposeBigNat ba = let pa = PrimArray ba :: PrimArray Word in (sizeofPrimArray pa, primArrayToReverseList pa)
+#else
+decomposeBigNat :: BigNat -> (Int, [Word])
 decomposeBigNat (BN# ba) = let pa = PrimArray ba :: PrimArray Word in (sizeofPrimArray pa, primArrayToReverseList pa)
+#endif
 {-# INLINE decomposeBigNat #-}
 
 primArrayToReverseList :: Prim a => PrimArray a -> [a]
