@@ -1,5 +1,6 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ParallelListComp #-}
+{-# LANGUAGE MagicHash #-}
 module Data.Discrimination.Internal
   ( runs
   , groupNum
@@ -7,6 +8,8 @@ module Data.Discrimination.Internal
   , updateBag
   , updateSet
   , spanEither
+  , integerCases
+  , naturalCases
   ) where
 
 import Data.Array as Array
@@ -14,6 +17,13 @@ import Data.Functor
 import Data.Int
 import qualified Data.List as List
 import Prelude hiding (read, concat)
+
+import GHC.Natural
+import GHC.Integer.GMP.Internals
+import GHC.Word
+import GHC.Exts
+import Data.Primitive.Types (Prim)
+import Data.Primitive.PrimArray
 
 --------------------------------------------------------------------------------
 -- * Utilities
@@ -55,3 +65,28 @@ spanEither k xs0 = go [] xs0 where
 fromRight :: Either a b -> b
 fromRight (Right y) = y
 fromRight _ = error "unstable discriminator"
+
+-------------------------------------------------------------------------------
+-- * Integer and Natural
+-------------------------------------------------------------------------------
+
+integerCases :: Integer -> Either (GmpSize,[GmpLimb]) (Either Int (GmpSize,[GmpLimb]))
+integerCases (Jn# b) = Left          $ decomposeBigNat b
+integerCases (S#  i) = Right . Left  $ I# i
+integerCases (Jp# b) = Right . Right $ decomposeBigNat b
+{-# INLINE integerCases #-}
+
+naturalCases :: Natural -> Either GmpLimb (GmpSize,[GmpLimb])
+naturalCases (NatS# w) = Left $ W# w
+naturalCases (NatJ# b) = Right $ decomposeBigNat b
+{-# INLINE naturalCases #-}
+
+-- We need to reverse the limb array. Its stored least-significant word first
+-- but for comparasion to work right we need most-significant words first.
+decomposeBigNat :: BigNat -> (GmpSize, [GmpLimb])
+decomposeBigNat (BN# ba) = let pa = PrimArray ba :: PrimArray Word in (sizeofPrimArray pa, primArrayToReverseList pa)
+{-# INLINE decomposeBigNat #-}
+
+primArrayToReverseList :: Prim a => PrimArray a -> [a]
+primArrayToReverseList xs = build (\c n -> foldlPrimArray (flip c) n xs)
+{-# INLINE primArrayToReverseList #-}

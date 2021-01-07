@@ -1,6 +1,5 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE RoleAnnotations #-}
@@ -22,15 +21,14 @@ module Data.Discrimination.Grouping
   , runGroup
   -- * Internals
   , hashing
-  , word8s
   ) where
 
 import Control.Monad hiding (mapM_)
 import Control.Monad.Primitive
 import Control.Monad.ST
-import Control.Monad.ST.Unsafe
 import Data.Complex
 import Data.Discrimination.Internal.WordMap as WordMap
+import Data.Discrimination.Internal
 import Data.Foldable hiding (concat)
 import Data.Functor.Compose
 import Data.Functor.Contravariant
@@ -41,16 +39,13 @@ import Data.Int
 import Data.List.NonEmpty (NonEmpty)
 import Data.Semigroup hiding (Any)
 import Data.Primitive.MutVar
-import Data.Primitive.PrimArray
 import Data.Promise
 import Data.Proxy
 import Data.Ratio
 import Data.Typeable
 import Data.Void
 import Data.Word
-import GHC.Integer.GMP.Internals
-import GHC.Word
-import Numeric.Natural
+import Numeric.Natural (Natural)
 import Prelude hiding (read, concat, mapM_)
 
 -- | Productive Stable Unordered Discriminator
@@ -161,15 +156,10 @@ instance Grouping a => Grouping (Complex a) where
   grouping = divide (\(a :+ b) -> (a, b)) grouping grouping
 
 instance Grouping Integer where
-  grouping = contramap word8s grouping
+  grouping = choose integerCases grouping (choose id grouping grouping)
 
-word8s :: Integer -> [Word8]
-word8s i = runST $ unsafeIOToST $ do
-  p@(MutablePrimArray mba) :: MutablePrimArray RealWorld Word8 <- newPrimArray (fromIntegral $ W# (sizeInBaseInteger i 256#))
-  _ <- exportIntegerToMutableByteArray i mba 0## 1#
-  primArrayToList <$> unsafeFreezePrimArray p
-
-instance Grouping Natural where grouping = contramap toInteger grouping
+instance Grouping Natural where
+  grouping = choose naturalCases grouping grouping
 
 #if __GLASGOW_HASKELL__ >= 800
 instance Grouping a => Grouping (Ratio a) where
