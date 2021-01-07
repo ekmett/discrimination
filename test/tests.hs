@@ -75,6 +75,7 @@ main = defaultMain $ testGroup "discrimination"
     , testGrouping (Proxy :: Proxy (Word8,Word8))
     , testGrouping (Proxy :: Proxy (Word8,Word8,Word8))
     , testGrouping (Proxy :: Proxy (Word8,Word8,Word8,Word8))
+    , testGrouping (Proxy :: Proxy Rational)
     , testGrouping (Proxy :: Proxy (Complex Word8))
     , testGrouping (Proxy :: Proxy (Maybe Word8))
     , testGrouping (Proxy :: Proxy (Either Word8 Word8))
