@@ -50,7 +50,6 @@ library
     ghc-prim,
     hashable      >= 1.2.7.0 && < 1.4,
     primitive     >= 0.7.1.0 && < 0.8,
-    profunctors   >= 5.6.1   && < 6,
     promises      >= 0.3     && < 0.4,
     transformers  >= 0.4.2.0 && < 0.6
 
