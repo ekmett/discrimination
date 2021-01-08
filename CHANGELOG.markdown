@@ -1,4 +1,4 @@
-## next
+## 0.4.1 [2021-01-08]
 
 * GHC-9.0 compatibility
 * Added `Ordering` discrimination
