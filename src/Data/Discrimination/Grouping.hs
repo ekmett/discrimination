@@ -47,6 +47,7 @@ import Data.Void
 import Data.Word
 import Numeric.Natural (Natural)
 import Prelude hiding (read, concat, mapM_)
+import Data.Functor.Classes (Eq1 (..))
 
 -- | Productive Stable Unordered Discriminator
 
@@ -131,7 +132,7 @@ hashing = contramap hash grouping
 --
 -- /Note:/ 'Eq' is a moral super class of 'Grouping'.
 -- It isn't because of some missing instances.
-class Grouping a where
+class Eq a => Grouping a where
   -- | For every surjection @f@,
   --
   -- @
@@ -181,13 +182,14 @@ instance (Grouping a, Integral a) => Grouping (Ratio a) where
 #endif
   grouping = divide (\r -> (numerator r, denominator r)) grouping grouping
 
-instance (Grouping1 f, Grouping1 g, Grouping a) => Grouping (Compose f g a) where
-  grouping = getCompose `contramap` grouping1 (grouping1 grouping)
-
-class Grouping1 f where
+class Eq1 f => Grouping1 f where
   grouping1 :: Group a -> Group (f a)
   default grouping1 :: Deciding1 Grouping f => Group a -> Group (f a)
   grouping1 = deciding1 (Proxy :: Proxy Grouping) grouping
+
+instance (Grouping1 f, Grouping1 g, Grouping a) => Grouping (Compose f g a) where
+  grouping = getCompose `contramap` grouping1 (grouping1 grouping)
+
 
 instance Grouping1 []
 instance Grouping1 Maybe

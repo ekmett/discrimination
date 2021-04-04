@@ -1,3 +1,8 @@
+## 0.5 [20yy-mm-dd]
+
+* `Eq` is a superclass of `Grouping`, `Ord` is a superclass of `Ordering`.
+* Drop support for GHC prior 8
+
 ## 0.4.1 [2021-01-08]
 
 * GHC-9.0 compatibility
