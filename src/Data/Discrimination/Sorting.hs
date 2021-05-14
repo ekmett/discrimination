@@ -37,6 +37,7 @@ import Data.Bits
 import Data.Discrimination.Grouping
 import Data.Discrimination.Internal
 import Data.Foldable as Foldable hiding (concat)
+import Data.Functor.Classes (Ord1 (..))
 import Data.Functor.Compose
 import Data.Functor.Contravariant
 import Data.Functor.Contravariant.Divisible
@@ -112,7 +113,7 @@ instance Monoid (Sort a) where
 -- @
 -- 'sortingCompare' x y ≡ 'compare' x y
 -- @
-class Grouping a => Sorting a where
+class (Ord a, Grouping a) => Sorting a where
   -- | For every strictly monotone-increasing function @f@:
   --
   -- @
@@ -189,7 +190,7 @@ instance (Sorting a, Sorting b, Sorting c, Sorting d) => Sorting (a, b, c, d)
 instance (Sorting1 f, Sorting1 g, Sorting a) => Sorting (Compose f g a) where
   sorting = getCompose `contramap` sorting1 (sorting1 sorting)
 
-class Grouping1 f => Sorting1 f  where
+class (Ord1 f, Grouping1 f) => Sorting1 f  where
   sorting1 :: Sort a -> Sort (f a)
   default sorting1 :: Deciding1 Sorting f => Sort a -> Sort (f a)
   sorting1 = deciding1 (Proxy :: Proxy Sorting) sorting
