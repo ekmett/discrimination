@@ -1,7 +1,9 @@
+distribution:           bionic
 branches:               master
 hlint:                  True
+hlint-job:              9.0.1
 hlint-yaml:             .hlint.yaml
 no-tests-no-benchmarks: False
 unconstrained:          False
-irc-channels:           irc.freenode.org#haskell-lens
+-- irc-channels:           irc.freenode.org#haskell-lens
 docspec:                True
