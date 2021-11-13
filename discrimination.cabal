@@ -51,7 +51,7 @@ library
     hashable      >= 1.2.7.0 && < 1.5,
     primitive     >= 0.7.1.0 && < 0.8,
     promises      >= 0.3     && < 0.4,
-    transformers  >= 0.4.2.0 && < 0.6
+    transformers  >= 0.4.2.0 && < 0.7
 
   if !impl(ghc >=8.0)
     build-depends: semigroups >= 0.18.5 && < 1
