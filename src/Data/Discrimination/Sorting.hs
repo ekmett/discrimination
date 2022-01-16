@@ -47,12 +47,14 @@ import Data.IntSet as IntSet
 import qualified Data.List as List
 import Data.List.NonEmpty (NonEmpty)
 import Data.Map as Map
+import Data.Ord
 import Data.Proxy
 import Data.Semigroup hiding (Any)
 import Data.Set as Set
 import Data.Typeable
 import Data.Void
 import Data.Word
+import GHC.Prim
 import Numeric.Natural (Natural)
 import Prelude hiding (read, concat)
 
@@ -178,6 +180,10 @@ instance Sorting Char where
 
 instance Sorting Void
 instance Sorting Bool
+
+instance forall a. Sorting a => Sorting (Down a) where
+  sorting = Sort $ \(xs :: [(Down a, b)]) -> reverse $ runSort sorting (coerce xs :: [(a, b)])
+
 instance Sorting Ordering
 instance Sorting a => Sorting [a]
 instance Sorting a => Sorting (NonEmpty a)

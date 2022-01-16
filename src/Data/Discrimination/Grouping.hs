@@ -38,6 +38,7 @@ import Data.Hashable
 import Data.Int
 import Data.List.NonEmpty (NonEmpty)
 import Data.Semigroup hiding (Any)
+import Data.Ord
 import Data.Primitive.MutVar
 import Data.Promise
 import Data.Proxy
@@ -157,6 +158,7 @@ instance Grouping Int where grouping = contramap fromIntegral groupingWord64
 instance Grouping Char where grouping = contramap (fromIntegral . fromEnum) groupingWord64
 
 instance Grouping Bool
+instance Grouping a => Grouping (Down a)
 instance Grouping Ordering
 instance (Grouping a, Grouping b) => Grouping (a, b)
 instance (Grouping a, Grouping b, Grouping c) => Grouping (a, b, c)
