@@ -100,7 +100,7 @@ naturalCases (NatJ# b) = Right $ decomposeBigNat b
 {-# INLINE naturalCases #-}
 
 -- We need to reverse the limb array. Its stored least-significant word first
--- but for comparasion to work right we need most-significant words first.
+-- but for comparison to work right we need most-significant words first.
 #ifdef MIN_VERSION_ghc_bignum
 decomposeBigNat :: ByteArray# -> (Int, [Word])
 decomposeBigNat ba = let pa = PrimArray ba :: PrimArray Word in (sizeofPrimArray pa, primArrayToReverseList pa)
