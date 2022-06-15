@@ -50,7 +50,7 @@ hashNub ys = go HS.empty ys where
         | HS.member x s = go s xs
         | otherwise     = x : go (HS.insert x s) xs
 
- -- | Sort via vector.
+-- | Sort via vector.
 introsort :: Ord a => [a] -> [a]
 introsort xs = runST $ do
     v <- V.unsafeThaw (V.fromList xs)
