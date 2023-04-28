@@ -1,6 +1,7 @@
 name:          discrimination
 category:      Data, Sorting
 version:       0.5
+x-revision:    2
 license:       BSD3
 cabal-version: >= 1.10
 license-file:  LICENSE
@@ -11,7 +12,7 @@ homepage:      http://github.com/ekmett/discrimination/
 bug-reports:   http://github.com/ekmett/discrimination/issues
 copyright:     Copyright (C) 2014-2015 Edward A. Kmett
 build-type:    Simple
-tested-with:   GHC == 8.0.2, GHC == 8.2.2, GHC == 8.4.4, GHC == 8.6.5, GHC == 8.8.4, GHC == 8.10.7, GHC == 9.0.2, GHC == 9.2.3, GHC == 9.4.1
+tested-with:   GHC == 8.0.2, GHC == 8.2.2, GHC == 8.4.4, GHC == 8.6.5, GHC == 8.8.4, GHC == 8.10.7, GHC == 9.0.2, GHC == 9.2.7, GHC == 9.4.5, GHC == 9.6.1
 synopsis:      Fast generic linear-time sorting, joins and container construction.
 description:
   This package provides fast, generic, linear-time discrimination and sorting.
@@ -49,7 +50,7 @@ library
     deepseq       >= 1.4.1.1 && < 1.5,
     ghc-prim,
     hashable      >= 1.2.7.0 && < 1.5,
-    primitive     >= 0.7.1.0 && < 0.8,
+    primitive     >= 0.7.1.0 && < 0.9,
     promises      >= 0.3     && < 0.4,
     transformers  >= 0.4.2.0 && < 0.7
 
