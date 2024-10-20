@@ -17,7 +17,7 @@ synopsis:      Fast generic linear-time sorting, joins and container constructio
 description:
   This package provides fast, generic, linear-time discrimination and sorting.
   .
-  The techniques applied are based on <http://www.diku.dk/hjemmesider/ansatte/henglein/papers/henglein2011a.pdf multiple> <http://www.diku.dk/hjemmesider/ansatte/henglein/papers/henglein2011c.pdf papers> and <https://www.youtube.com/watch?v=sz9ZlZIRDAg talks> by <http://www.diku.dk/hjemmesider/ansatte/henglein/ Fritz Henglein>.
+  The techniques applied are based on <http://hjemmesider.diku.dk/~henglein/papers/henglein2011a.pdf multiple> <http://hjemmesider.diku.dk/~henglein/papers/henglein2011c.pdf papers> and <https://www.youtube.com/watch?v=sz9ZlZIRDAg talks> by <http://www.diku.dk/hjemmesider/ansatte/henglein/ Fritz Henglein>.
 
 extra-source-files:
   .gitignore
