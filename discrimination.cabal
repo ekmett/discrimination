@@ -45,11 +45,11 @@ library
   build-depends:
     array         >= 0.5.1.0 && < 0.6,
     base          >= 4.9     && < 5,
-    containers    >= 0.5.6.2 && < 0.8,
+    containers    >= 0.5.6.2 && < 0.9,
     contravariant >= 1.5.3   && < 2,
     deepseq       >= 1.4.1.1 && < 1.6,
     ghc-prim,
-    hashable      >= 1.2.7.0 && < 1.5,
+    hashable      >= 1.2.7.0 && < 1.6,
     primitive     >= 0.7.1.0 && < 0.10,
     promises      >= 0.3     && < 0.4,
     transformers  >= 0.4.2.0 && < 0.7
