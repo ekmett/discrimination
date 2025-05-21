@@ -12,7 +12,7 @@ homepage:      http://github.com/ekmett/discrimination/
 bug-reports:   http://github.com/ekmett/discrimination/issues
 copyright:     Copyright (C) 2014-2015 Edward A. Kmett
 build-type:    Simple
-tested-with:   GHC == 8.0.2, GHC == 8.2.2, GHC == 8.4.4, GHC == 8.6.5, GHC == 8.8.4, GHC == 8.10.7, GHC == 9.0.2, GHC == 9.2.8, GHC == 9.4.8, GHC == 9.6.6, GHC==9.8.2, GHC==9.10.1
+tested-with:   GHC == 8.0.2, GHC == 8.2.2, GHC == 8.4.4, GHC == 8.6.5, GHC == 8.8.4, GHC == 8.10.7, GHC == 9.0.2, GHC == 9.2.8, GHC == 9.4.8, GHC == 9.6.7, GHC==9.8.4, GHC==9.10.2
 synopsis:      Fast generic linear-time sorting, joins and container construction.
 description:
   This package provides fast, generic, linear-time discrimination and sorting.
@@ -26,7 +26,7 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: git://github.com/ekmett/discrimination.git
+  location: https://github.com/ekmett/discrimination.git
 
 library
   default-language: Haskell2010
