@@ -1,3 +1,7 @@
+## next [????-??-??]
+
+* Remove unused `transformers` dependency.
+
 ## 0.5 [2022-06-15]
 
 * `Eq` is a superclass of `Grouping`, `Ord` is a superclass of `Ordering`.

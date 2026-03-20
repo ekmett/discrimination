@@ -51,8 +51,7 @@ library
     ghc-prim,
     hashable      >= 1.2.7.0 && < 1.6,
     primitive     >= 0.7.1.0 && < 0.10,
-    promises      >= 0.3     && < 0.4,
-    transformers  >= 0.4.2.0 && < 0.7
+    promises      >= 0.3     && < 0.4
 
   if !impl(ghc >=8.0)
     build-depends: semigroups >= 0.18.5 && < 1
@@ -72,7 +71,6 @@ test-suite properties
   build-depends:
     base >= 4.8,
     containers,
-    criterion,
     deepseq,
     discrimination,
     hashable,
@@ -100,9 +98,7 @@ benchmark wordmap
     criterion,
     deepseq,
     discrimination,
-    ghc-prim,
-    unordered-containers,
-    primitive
+    unordered-containers
 
 benchmark examples
   type:             exitcode-stdio-1.0
