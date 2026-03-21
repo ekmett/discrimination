@@ -4,3 +4,6 @@ no-tests-no-benchmarks: False
 unconstrained:          False
 -- irc-channels:           irc.freenode.org#haskell-lens
 docspec:                True
+-- Needed until dependencies support GHC 9.14 (see, for instance,
+-- https://github.com/haskell/aeson/issues/1155)
+head-hackage:           >=9.14
