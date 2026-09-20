@@ -5,7 +5,6 @@
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DefaultSignatures #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# OPTIONS_GHC -fno-cse -fno-full-laziness #-}
@@ -42,7 +41,6 @@ import Data.Primitive.MutVar
 import Data.Promise
 import Data.Proxy
 import Data.Ratio
-import Data.Typeable
 import Data.Void
 import Data.Word
 import Numeric.Natural (Natural)
@@ -54,7 +52,7 @@ import Data.Functor.Classes (Eq1 (..))
 newtype Group a = Group
   { getGroup :: forall m b. PrimMonad m
              => (b -> m (b -> m ())) -> m (a -> b -> m ())
-  } deriving Typeable
+  }
 
 -- Note: Group should be
 --

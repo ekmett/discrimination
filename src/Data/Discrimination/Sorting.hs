@@ -50,7 +50,6 @@ import Data.Map as Map
 import Data.Proxy
 import Data.Semigroup hiding (Any)
 import Data.Set as Set
-import Data.Typeable
 import Data.Void
 import Data.Word
 import Numeric.Natural (Natural)
@@ -70,7 +69,6 @@ import Data.Functor.Classes (Ord1 (..))
 
 -- TODO: use [(a,b)] -> [NonEmpty b] to better indicate safety?
 newtype Sort a = Sort { runSort :: forall b. [(a,b)] -> [[b]] }
-  deriving Typeable
 
 mkSort :: (forall b. [(a, b)] -> [[b]]) -> Sort a
 mkSort f = Sort $ \xs -> case xs of
